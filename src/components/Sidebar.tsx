@@ -8,7 +8,6 @@ import { FaRegQuestionCircle } from "react-icons/fa";
 import { HiOutlineX } from "react-icons/hi";
 import Header from "./Header";
 
-
 function Sidebar({ children }: { children?: React.ReactNode }) {
   const MIN_WIDTH = 200;
   const MAX_WIDTH = 480;
