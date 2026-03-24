@@ -52,7 +52,7 @@ const AQIChartCard = React.memo(() => {
         />
       </div>
 
-      <div className="flex items-center justify-center gap-4 mt -4 text-[10px] font-medium text-gray-500">
+      {/* <div className="flex items-center justify-center gap-4 mt -4 text-[10px] font-medium text-gray-500">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-[#6366f1]"></span>
           Money Income
@@ -61,7 +61,7 @@ const AQIChartCard = React.memo(() => {
           <span className="w-2 h-2 rounded-full bg-black"></span>
           Current State
         </div>
-      </div>
+      </div> */}
     </div>
   );
 });

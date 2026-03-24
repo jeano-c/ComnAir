@@ -5,9 +5,9 @@ import { MdOutlineDashboard } from "react-icons/md";
 import { IoBarChartOutline, IoSettingsOutline } from "react-icons/io5";
 import { CiCreditCard1 } from "react-icons/ci";
 import { FaRegQuestionCircle } from "react-icons/fa";
-import logo from "../../public/imgs/logo.png";
 import { HiOutlineX } from "react-icons/hi";
-import Header from "./Header"; // <-- Import the new Header component
+import Header from "./Header";
+
 
 function Sidebar({ children }: { children?: React.ReactNode }) {
   const MIN_WIDTH = 200;
@@ -155,7 +155,7 @@ function Sidebar({ children }: { children?: React.ReactNode }) {
           <div className="px-6 flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 flex items-center justify-center">
-                <img src={logo} alt="ComnAir Logo" />
+                <img src="/imgs/logo.png" alt="ComnAir Logo" />
               </div>
               <span className="font-bold text-2xl tracking-wide">ComnAir</span>
             </div>
@@ -241,7 +241,6 @@ function Sidebar({ children }: { children?: React.ReactNode }) {
         )}
 
         <div
-        
           className={`bg-[#f8fafc] w-full h-full flex flex-col shadow-2xl overflow-hidden relative z-10 transition-all duration-300 ${isOpen ? "rounded-l-4xl rounded-r-xl" : "rounded-none"}`}
         >
           {/* INJECTED HEADER COMPONENT */}
