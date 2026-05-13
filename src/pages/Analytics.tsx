@@ -66,7 +66,7 @@ const AQIChartCard = React.memo(({ location }: { location: any }) => {
   ];
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 shadow-sm flex flex-col w-full">
+    <div className="bg-white border border-gray-200 rounded-xl p-4 pb-20 sm:p-6 shadow-sm flex flex-col w-full">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
         <h3 className="font-bold text-sm text-gray-800">
           {location.name} - Air Quality Index
@@ -120,7 +120,7 @@ function Analytics() {
       {isLocationsLoading ? (
         <div className="text-gray-500">Loading locations...</div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 pb-20">
           {locations?.data?.map((loc: any) => (
             <AQIChartCard key={loc.id} location={loc} />
           ))}
