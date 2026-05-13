@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, Variants } from "framer-motion";
-import { useLocation, Link } from "react-router";
+import { useLocation, Link, href } from "react-router";
 import { MdOutlineDashboard } from "react-icons/md";
 import { IoBarChartOutline, IoSettingsOutline } from "react-icons/io5";
 import { CiCreditCard1 } from "react-icons/ci";
 import { FaRegQuestionCircle } from "react-icons/fa";
 import { HiOutlineX } from "react-icons/hi";
 import Header from "./Header";
+import { IoDocumentTextOutline } from "react-icons/io5";
+import { IoMegaphoneOutline } from "react-icons/io5";
+
+import { BiCategoryAlt } from "react-icons/bi";
 
 function Sidebar({ children }: { children?: React.ReactNode }) {
   const MIN_WIDTH = 200;
@@ -105,14 +109,24 @@ function Sidebar({ children }: { children?: React.ReactNode }) {
       label: "AQI Guide",
       href: "/aqi",
     },
+    {
+      icon: <IoDocumentTextOutline className="w-5 h-5" />,
+      label: "Reports",
+      href: "/reports",
+    },
+    {
+      icon: <BiCategoryAlt className="w-5 h-5" />,
+      label: "Categories",
+      href: "/category",
+    },
+    {
+      icon: <IoMegaphoneOutline className="w-5 h-5" />,
+      label: "Announcements",
+      href: "/notification",
+    },
   ];
 
   const bottomMenuItems = [
-    {
-      icon: <FaRegQuestionCircle className="w-5 h-5" />,
-      label: "Help",
-      href: "/help",
-    },
     {
       icon: <IoSettingsOutline className="w-5 h-5" />,
       label: "Create an Account",
@@ -154,7 +168,11 @@ function Sidebar({ children }: { children?: React.ReactNode }) {
           <div className="px-6 flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 flex items-center justify-center">
-                <img src="/imgs/logo.png" alt="ComnAir Logo" />
+                <img
+                  src="/imgs/logowhite.png"
+                  alt="ComnAir Logo"  
+                  className="w-full h-full object-contain" // Forces image to fit the 7x7 box
+                />
               </div>
               <span className="font-bold text-2xl tracking-wide">ComnAir</span>
             </div>

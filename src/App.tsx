@@ -5,13 +5,18 @@ import {
   RouterProvider,
 } from "react-router";
 import Sidebar from "./components/Sidebar";
-import Home from "./pages/Dashboard"; // Adjust the file name if you saved it as Home.tsx
+import Home from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
 import Aqi from "./pages/Aqi";
 import Login from "./pages/Login";
 import CreateAccount from "./pages/CreateAccount";
 import "./App.css";
 import { useAuth } from "./hooks/useAuth";
+import Reports from "./pages/Reports";
+import ReportDetails from "./pages/Reports/ReportDetails";
+import { Dashboard } from "./pages/test";
+import SpikesPage from "./pages/SpikesPage";
+import ReportCategories from "./pages/ReportCategories";
 
 function Layout() {
   return (
@@ -24,7 +29,6 @@ function Layout() {
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Wait for TanStack Query to finish checking the token
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
@@ -78,6 +82,21 @@ const router = createBrowserRouter([
         path: "signup",
         element: <CreateAccount />,
       },
+      {
+        path: "reports",
+        element: <Reports />,
+      },
+      {
+        path: "reports/:id",
+        element: <ReportDetails />,
+      },
+      {
+        path: "notification",
+        element: <SpikesPage />,
+      },
+
+      { path: "category", element: <ReportCategories /> },
+      { path: "test", element: <Dashboard /> },
     ],
   },
 ]);

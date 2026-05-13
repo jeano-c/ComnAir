@@ -51,7 +51,7 @@ export default function Login() {
 
         <div className="relative z-10 flex flex-col items-center px-10 text-center mt-[-10%]">
           <div className="w-24 h-24 rounded-2xl bg-[#32C85A] shadow-md flex items-center justify-center mb-6">
-            <img src="/imgs/logo.png" alt="Logo" className="h-14 object-contain" />
+            <img src="/imgs/logowhite.png" alt="Logo" className="h-14 object-contain" />
           </div>
 
           <h1 className="text-[32px] font-extrabold text-black mb-2">
