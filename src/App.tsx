@@ -17,11 +17,15 @@ import ReportDetails from "./pages/Reports/ReportDetails";
 import { Dashboard } from "./pages/test";
 import SpikesPage from "./pages/SpikesPage";
 import ReportCategories from "./pages/ReportCategories";
+import AqiNotifications from "./components/AqiNotifications";
+import SpikeDrawer from "./components/SpikeDrawer";
 
 function Layout() {
   return (
     <Sidebar>
       <Outlet />
+      <AqiNotifications isAdmin={true} />
+      <SpikeDrawer />
     </Sidebar>
   );
 }

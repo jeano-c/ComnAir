@@ -120,7 +120,7 @@ export default function AnnouncementsPage() {
             </div>
 
             {/* Right Column: Forms & Recent */}
-            <div className="lg:col-span-8 flex flex-col mt-9">
+            <div className="lg:col-span-8 flex flex-col mt-9">  
               {/* 🛑 THE NEW AI TOGGLE COMPONENT 🛑 */}
               <AiAutomationToggle />
 

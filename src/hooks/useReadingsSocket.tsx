@@ -12,6 +12,8 @@ export function useReadingsSocket() {
   // NEW State
   const [latestSpike, setLatestSpike] = useState<any>(null);
   const [systemNotification, setSystemNotification] = useState<any>(null);
+  const [latestSensorStatusAlert, setLatestSensorStatusAlert] = useState<any>(null);
+  const [latestDeviceAlert, setLatestDeviceAlert] = useState<any>(null);
 
   useEffect(() => {
     socket.connect();
@@ -30,6 +32,23 @@ export function useReadingsSocket() {
       setLatestAlert(alertData);
     });
 
+    socket.on("sensorStatusAlert", (statusAlert) => {
+      console.warn(
+        `[${statusAlert.level}] SENSOR STATUS ALERT:`,
+        statusAlert.message,
+      );
+      setLatestSensorStatusAlert(statusAlert);
+    });
+
+    socket.on("deviceStatusChanged", (deviceAlert) => {
+      console.warn(
+        `[${deviceAlert.status}] GATEWAY DEVICE ALERT:`,
+        deviceAlert.message,
+      );
+      setLatestDeviceAlert(deviceAlert);
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
+    });
+
     socket.on("aqiSpikeAlert", (spikeData) => {
       console.warn("Sudden AQI Spike Detected:", spikeData);
       setLatestSpike(spikeData);
@@ -43,6 +62,8 @@ export function useReadingsSocket() {
     return () => {
       socket.off("onNewReading");
       socket.off("sensorAlert");
+      socket.off("sensorStatusAlert");
+      socket.off("deviceStatusChanged");
       socket.off("aqiSpikeAlert");
       socket.off("systemNotification");
       socket.disconnect();
@@ -109,6 +130,8 @@ export function useReadingsSocket() {
 
   const clearSystemNotification = () => setSystemNotification(null);
   const clearLatestSpike = () => setLatestSpike(null);
+  const clearLatestSensorStatusAlert = () => setLatestSensorStatusAlert(null);
+  const clearLatestDeviceAlert = () => setLatestDeviceAlert(null);
 
   return {
     socket,
@@ -121,9 +144,13 @@ export function useReadingsSocket() {
     toggleAiSetting, // <-- Exported
     clearSystemNotification,
     clearLatestSpike,
+    clearLatestSensorStatusAlert,
+    clearLatestDeviceAlert,
     latestReading,
     latestAlert,
     latestSpike,
+    latestSensorStatusAlert,
+    latestDeviceAlert,
     systemNotification,
   };
 }
