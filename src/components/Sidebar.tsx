@@ -16,7 +16,9 @@ function Sidebar({ children }: { children?: React.ReactNode }) {
   const MIN_WIDTH = 200;
   const MAX_WIDTH = 480;
   const MemoChildren = useMemo(
-    () => <div className="flex-1 overflow-auto">{children}</div>,
+    () => (
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">{children}</div>
+    ),
     [children],
   );
 

@@ -1,5 +1,8 @@
 import React from "react";
 import { useReadingsSocket } from "../hooks/useReadingsSocket"; // adjust path
+import { FaExclamationTriangle, FaLaptop } from "react-icons/fa";
+import { MdOutlineSensorsOff, MdShowChart } from "react-icons/md";
+import { IoClose } from "react-icons/io5";
 
 // Pass an `isAdmin` prop based on your auth context to determine if they
 // should see the "Spike Detection & Broadcast" prompt.
@@ -79,7 +82,7 @@ export default function AqiNotifications({
           <div className="flex justify-between items-start">
             <div>
               <h3
-                className={`font-bold text-lg ${
+                className={`font-bold text-lg flex items-center gap-2 ${
                   systemNotification.level === "DANGER"
                     ? "text-red-800"
                     : systemNotification.level === "WARNING"
@@ -87,7 +90,8 @@ export default function AqiNotifications({
                       : "text-blue-800"
                 }`}
               >
-                ⚠️ {systemNotification.title}
+                <FaExclamationTriangle className="text-base shrink-0" />
+                <span>{systemNotification.title}</span>
               </h3>
               <p className="mt-1 text-sm text-gray-700 font-medium">
                 {systemNotification.message}
@@ -100,9 +104,10 @@ export default function AqiNotifications({
             </div>
             <button
               onClick={clearSystemNotification}
-              className="text-gray-400 hover:text-gray-800 transition"
+              className="text-gray-400 hover:text-gray-800 transition p-1 rounded-md hover:bg-black/5 cursor-pointer"
+              aria-label="Close notification"
             >
-              ✕
+              <IoClose className="text-lg" />
             </button>
           </div>
         </div>
@@ -112,8 +117,10 @@ export default function AqiNotifications({
       {latestSensorStatusAlert && (
         <div className="pointer-events-auto shadow-xl rounded-xl border-l-4 border-red-500 bg-red-50 p-4 font-sans animate-bounce-short">
           <div className="flex justify-between items-start">
-            <div className="flex items-start gap-2.5">
-              <span className="text-xl">⚠️</span>
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-red-100 border border-red-200 flex items-center justify-center text-red-600 shrink-0">
+                <MdOutlineSensorsOff className="text-xl" />
+              </div>
               <div>
                 <h3 className="font-bold text-sm text-red-900">
                   Hardware Sensor Disconnected
@@ -133,9 +140,10 @@ export default function AqiNotifications({
             </div>
             <button
               onClick={clearLatestSensorStatusAlert}
-              className="text-gray-400 hover:text-gray-800 transition cursor-pointer p-1"
+              className="text-gray-400 hover:text-gray-800 transition cursor-pointer p-1 rounded-md hover:bg-black/5"
+              aria-label="Close alert"
             >
-              ✕
+              <IoClose className="text-lg" />
             </button>
           </div>
         </div>
@@ -151,8 +159,16 @@ export default function AqiNotifications({
           }`}
         >
           <div className="flex justify-between items-start">
-            <div className="flex items-start gap-2.5">
-              <span className="text-xl">💻</span>
+            <div className="flex items-start gap-3">
+              <div
+                className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 ${
+                  latestDeviceAlert.status === "ONLINE"
+                    ? "bg-green-100 border-green-200 text-green-700"
+                    : "bg-orange-100 border-orange-200 text-orange-700"
+                }`}
+              >
+                <FaLaptop className="text-lg" />
+              </div>
               <div>
                 <h3
                   className={`font-bold text-sm ${
@@ -184,9 +200,10 @@ export default function AqiNotifications({
             </div>
             <button
               onClick={clearLatestDeviceAlert}
-              className="text-gray-400 hover:text-gray-800 transition cursor-pointer p-1"
+              className="text-gray-400 hover:text-gray-800 transition cursor-pointer p-1 rounded-md hover:bg-black/5"
+              aria-label="Close alert"
             >
-              ✕
+              <IoClose className="text-lg" />
             </button>
           </div>
         </div>
@@ -196,14 +213,16 @@ export default function AqiNotifications({
       {isAdmin && latestSpike && (
         <div className="pointer-events-auto shadow-2xl rounded-lg bg-gray-900 border border-gray-700 p-4 text-white">
           <div className="flex justify-between items-start mb-2">
-            <h3 className="font-bold text-red-400 flex items-center gap-2">
-              🚨 System Alert: Sudden Spike
+            <h3 className="font-bold text-rose-400 flex items-center gap-2">
+              <MdShowChart className="text-lg shrink-0" />
+              <span>System Alert: Sudden Spike</span>
             </h3>
             <button
               onClick={clearLatestSpike}
-              className="text-gray-500 hover:text-white"
+              className="text-gray-400 hover:text-white p-1 rounded-md hover:bg-gray-800 transition cursor-pointer"
+              aria-label="Dismiss alert"
             >
-              ✕
+              <IoClose className="text-lg" />
             </button>
           </div>
 
@@ -212,13 +231,13 @@ export default function AqiNotifications({
           <div className="flex gap-2">
             <button
               onClick={handleBroadcastSpike}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-3 rounded transition"
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-3 rounded transition cursor-pointer"
             >
               Broadcast Warning to Users
             </button>
             <button
               onClick={clearLatestSpike}
-              className="bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-bold py-2 px-3 rounded transition border border-gray-600"
+              className="bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-bold py-2 px-3 rounded transition border border-gray-600 cursor-pointer"
             >
               Dismiss
             </button>

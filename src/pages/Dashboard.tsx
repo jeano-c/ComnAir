@@ -245,138 +245,122 @@ function ExpandedLocationDetails({
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 w-full">
-        <div className="flex-1 flex flex-col gap-6">
-          {/* Dynamic Highlight Card */}
-          <div
-            className={`w-full sm:w-64 border rounded-xl p-4 shadow-sm bg-white flex flex-col relative transition-all duration-300 ${
-              isCurrentSensorFallback
-                ? "border-purple-300 bg-purple-50/20"
-                : isCurrentSensorOnline
-                ? "border-gray-200"
-                : "border-red-300 bg-red-50/20"
-            }`}
-          >
-            <MdOutlineFileDownload className="absolute top-4 right-4 text-gray-400 text-xl cursor-pointer hover:text-[#1F8F22]" />
+      <div className="flex flex-col gap-6 w-full">
+        {/* Dynamic Highlight Card */}
+        <div
+          className={`w-full sm:w-72 border rounded-xl p-4 shadow-sm bg-white flex flex-col relative transition-all duration-300 ${
+            isCurrentSensorFallback
+              ? "border-purple-300 bg-purple-50/20"
+              : isCurrentSensorOnline
+              ? "border-gray-200"
+              : "border-red-300 bg-red-50/20"
+          }`}
+        >
+          <MdOutlineFileDownload className="absolute top-4 right-4 text-gray-400 text-xl cursor-pointer hover:text-[#1F8F22]" />
 
-            <span className="text-xs font-semibold text-gray-400 mb-1">
-              {currentSensorConfig.label} ({currentSensorConfig.unit})
-            </span>
+          <span className="text-xs font-semibold text-gray-400 mb-1">
+            {currentSensorConfig.label} ({currentSensorConfig.unit})
+          </span>
 
-            {/* Value Display */}
-            {isCurrentSensorOnline ? (
-              <div className="flex flex-col">
-                <span className="text-3xl font-extrabold text-[#1e293b]">
-                  {currentRawVal !== undefined && currentRawVal !== null
-                    ? Number(currentRawVal).toFixed(4)
-                    : "--"}
+          {/* Value Display */}
+          {isCurrentSensorOnline ? (
+            <div className="flex flex-col">
+              <span className="text-3xl font-extrabold text-[#1e293b]">
+                {currentRawVal !== undefined && currentRawVal !== null
+                  ? Number(currentRawVal).toFixed(4)
+                  : "--"}
+              </span>
+              {isCurrentSensorFallback && (
+                <span className="text-[11px] font-semibold text-purple-700 mt-1 flex items-center gap-1">
+                  <FaGlobeAmericas className="text-[10px]" /> Open-Meteo Satellite Data
                 </span>
-                {isCurrentSensorFallback && (
-                  <span className="text-[11px] font-semibold text-purple-700 mt-1 flex items-center gap-1">
-                    <FaGlobeAmericas className="text-[10px]" /> Open-Meteo Satellite Data
-                  </span>
-                )}
-              </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              <span className="text-2xl font-black text-red-600 flex items-center gap-1.5">
+                <MdOutlineSensorsOff className="text-xl" /> Disconnected
+              </span>
+              <span className="text-[11px] text-gray-500 mt-1">
+                {activeSensor === "pm25"
+                  ? "No packet received from probe"
+                  : "Zero value / No input detected"}
+              </span>
+            </div>
+          )}
+
+          {/* Status and Last Active Meta */}
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+            {isCurrentSensorFallback ? (
+              <span className="text-xs font-bold text-purple-700 bg-purple-100 border border-purple-200 px-2.5 py-0.5 rounded-md flex items-center gap-1.5">
+                <FaGlobeAmericas className="text-xs text-purple-600" /> API Fallback
+              </span>
+            ) : isCurrentSensorOnline ? (
+              <span className="text-xs font-bold text-[#1F8F22] bg-green-50 border border-green-200 px-2.5 py-0.5 rounded-md flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping" /> Hardware Live
+              </span>
             ) : (
-              <div className="flex flex-col">
-                <span className="text-2xl font-black text-red-600 flex items-center gap-1.5">
-                  <MdOutlineSensorsOff className="text-xl" /> Disconnected
-                </span>
-                <span className="text-[11px] text-gray-500 mt-1">
-                  {activeSensor === "pm25"
-                    ? "No packet received from probe"
-                    : "Zero value / No input detected"}
-                </span>
-              </div>
+              <span className="text-xs font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                <FaExclamationTriangle className="text-[10px]" /> Offline
+              </span>
             )}
 
-            {/* Status and Last Active Meta */}
-            <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-              {isCurrentSensorFallback ? (
-                <span className="text-xs font-bold text-purple-700 bg-purple-100 border border-purple-200 px-2.5 py-0.5 rounded-md flex items-center gap-1.5">
-                  <FaGlobeAmericas className="text-xs text-purple-600" /> API Fallback
-                </span>
-              ) : isCurrentSensorOnline ? (
-                <span className="text-xs font-bold text-[#1F8F22] bg-green-50 border border-green-200 px-2.5 py-0.5 rounded-md flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping" /> Hardware Live
-                </span>
-              ) : (
-                <span className="text-xs font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                  <FaExclamationTriangle className="text-[10px]" /> Offline
-                </span>
-              )}
-
-              {isCurrentSensorFallback ? (
-                <span className="text-[10px] text-purple-600 font-medium">
-                  Probe Offline
-                </span>
-              ) : lastValidReading && !isCurrentSensorOnline ? (
-                <span className="text-[10px] text-gray-500 font-medium">
-                  Last active: {new Date(lastValidReading.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Dynamic Chart with Disconnected Notice */}
-          <div className="w-full border border-[#e2e8f0] rounded-xl p-4 sm:p-6 shadow-sm bg-white min-h-75 sm:min-h-87.5 transition-all duration-300 flex flex-col">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-4">
-              <h3 className="font-bold text-sm text-gray-700">
-                {currentSensorConfig.label} History ({currentSensorConfig.fullName})
-              </h3>
-
-              {!isCurrentSensorOnline && (
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-md">
-                  <FaExclamationTriangle className="text-xs" /> Sensor disconnected — displaying recorded history
-                </span>
-              )}
-            </div>
-
-            <div className="h-62.5 sm:h-75 w-full">
-              {validData.length > 0 ? (
-                <LineChart
-                  xAxis={[
-                    {
-                      data: xData,
-                      scaleType: "point",
-                    },
-                  ]}
-                  series={[
-                    {
-                      data: yData,
-                      color: isCurrentSensorOnline ? currentSensorConfig.color : "#94a3b8",
-                      area: true,
-                      showMark: true,
-                      valueFormatter: (value) =>
-                        value !== null
-                          ? `${value} ${currentSensorConfig.unit}`
-                          : "--",
-                    },
-                  ]}
-                  margin={{ top: 10, bottom: 30, left: 50, right: 20 }}
-                />
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2">
-                  <MdOutlineSensorsOff className="text-3xl text-gray-300" />
-                  <span>No valid readings recorded yet for {currentSensorConfig.label}.</span>
-                </div>
-              )}
-            </div>
+            {isCurrentSensorFallback ? (
+              <span className="text-[10px] text-purple-600 font-medium">
+                Probe Offline
+              </span>
+            ) : lastValidReading && !isCurrentSensorOnline ? (
+              <span className="text-[10px] text-gray-500 font-medium">
+                Last active: {new Date(lastValidReading.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            ) : null}
           </div>
         </div>
 
-        {/* Right Action Panel */}
-        <div className="w-full lg:w-1/3 flex flex-col items-center justify-center border-t lg:border-t-0 lg:border-l border-gray-100 pt-6 lg:pt-0 gap-4 sm:gap-6">
-          <span className="text-sm font-semibold text-gray-700 text-center">
-            Hardware & Sensor Controls
-          </span>
+        {/* Dynamic Chart with Disconnected Notice */}
+        <div className="w-full border border-[#e2e8f0] rounded-xl p-4 sm:p-6 shadow-sm bg-white min-h-75 sm:min-h-87.5 transition-all duration-300 flex flex-col">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-4">
+            <h3 className="font-bold text-sm text-gray-700">
+              {currentSensorConfig.label} History ({currentSensorConfig.fullName})
+            </h3>
 
-          <button
-            onClick={onOpenDiagnostics}
-            className="w-full sm:w-auto bg-[#1F8F22] hover:bg-[#1a7a1d] text-white px-6 py-3 rounded-lg font-medium text-sm transition shadow-md hover:shadow-lg active:scale-95 duration-150 flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <MdSensors className="text-lg" /> View Sensor Diagnostics
-          </button>
+            {!isCurrentSensorOnline && (
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-md">
+                <FaExclamationTriangle className="text-xs" /> Sensor disconnected — displaying recorded history
+              </span>
+            )}
+          </div>
+
+          <div className="h-62.5 sm:h-75 w-full">
+            {validData.length > 0 ? (
+              <LineChart
+                xAxis={[
+                  {
+                    data: xData,
+                    scaleType: "point",
+                  },
+                ]}
+                series={[
+                  {
+                    data: yData,
+                    color: isCurrentSensorOnline ? currentSensorConfig.color : "#94a3b8",
+                    area: true,
+                    showMark: true,
+                    valueFormatter: (value) =>
+                      value !== null
+                        ? `${value} ${currentSensorConfig.unit}`
+                        : "--",
+                  },
+                ]}
+                margin={{ top: 10, bottom: 30, left: 50, right: 20 }}
+              />
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2">
+                <MdOutlineSensorsOff className="text-3xl text-gray-300" />
+                <span>No valid readings recorded yet for {currentSensorConfig.label}.</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

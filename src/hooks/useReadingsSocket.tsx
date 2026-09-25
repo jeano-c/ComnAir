@@ -14,6 +14,7 @@ export function useReadingsSocket() {
   const [systemNotification, setSystemNotification] = useState<any>(null);
   const [latestSensorStatusAlert, setLatestSensorStatusAlert] = useState<any>(null);
   const [latestDeviceAlert, setLatestDeviceAlert] = useState<any>(null);
+  const [latestAnnouncement, setLatestAnnouncement] = useState<any>(null);
 
   useEffect(() => {
     socket.connect();
@@ -59,6 +60,10 @@ export function useReadingsSocket() {
       setSystemNotification(notification);
     });
 
+    socket.on("announcementCreated", (announcement) => {
+      setLatestAnnouncement(announcement);
+    });
+
     return () => {
       socket.off("onNewReading");
       socket.off("sensorAlert");
@@ -66,13 +71,19 @@ export function useReadingsSocket() {
       socket.off("deviceStatusChanged");
       socket.off("aqiSpikeAlert");
       socket.off("systemNotification");
-      socket.disconnect();
+      socket.off("announcementCreated");
+      // Keep socket alive across component navigations
     };
   }, [queryClient]);
 
   const createReading = (data: any) => {
     return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        resolve({ error: "Request timed out" });
+      }, 5000);
+      if (!socket.connected) socket.connect();
       socket.emit("createReading", data, (response: any) => {
+        clearTimeout(timer);
         if (response?.error) {
           reject(new Error(response.error));
         } else {
@@ -84,19 +95,45 @@ export function useReadingsSocket() {
 
   const findAllReadings = () => {
     return new Promise((resolve) => {
-      socket.emit("findAllReadings", (data: any) => resolve(data));
+      const timer = setTimeout(() => resolve([]), 3000);
+      if (!socket.connected) socket.connect();
+      socket.emit("findAllReadings", (data: any) => {
+        clearTimeout(timer);
+        resolve(data);
+      });
     });
   };
 
   const removeReading = (id: number) => {
     return new Promise((resolve) => {
-      socket.emit("removeReading", id, (data: any) => resolve(data));
+      const timer = setTimeout(() => resolve({ error: "Timed out" }), 3000);
+      if (!socket.connected) socket.connect();
+      socket.emit("removeReading", id, (data: any) => {
+        clearTimeout(timer);
+        resolve(data);
+      });
     });
   };
 
   const fetchAqiSpikes = () => {
     return new Promise((resolve) => {
-      socket.emit("getAqiSpikes", (data: any) => resolve(data));
+      const timer = setTimeout(() => resolve([]), 2500);
+      if (!socket.connected) socket.connect();
+      socket.emit("getAqiSpikes", (data: any) => {
+        clearTimeout(timer);
+        resolve(data);
+      });
+    });
+  };
+
+  const fetchAnnouncements = () => {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve([]), 2500);
+      if (!socket.connected) socket.connect();
+      socket.emit("getAnnouncements", (data: any) => {
+        clearTimeout(timer);
+        resolve(data);
+      });
     });
   };
 
@@ -107,24 +144,38 @@ export function useReadingsSocket() {
     aqiSpikeId?: number | null;
   }) => {
     return new Promise((resolve) => {
-      socket.emit("broadcastAnnouncement", payload, (response: any) =>
-        resolve(response),
+      const timer = setTimeout(
+        () => resolve({ error: "Broadcast request timed out" }),
+        5000,
       );
+      if (!socket.connected) socket.connect();
+      socket.emit("broadcastAnnouncement", payload, (response: any) => {
+        clearTimeout(timer);
+        resolve(response);
+      });
     });
   };
 
   // --- 🛑 NEW: AI TOGGLE FUNCTIONS ---
   const getAiSetting = () => {
     return new Promise((resolve) => {
-      socket.emit("getAiSetting", (response: any) => resolve(response));
+      const timer = setTimeout(() => resolve({ isEnabled: false }), 2500);
+      if (!socket.connected) socket.connect();
+      socket.emit("getAiSetting", (response: any) => {
+        clearTimeout(timer);
+        resolve(response);
+      });
     });
   };
 
   const toggleAiSetting = (enable: boolean) => {
     return new Promise((resolve) => {
-      socket.emit("toggleAiSetting", enable, (response: any) =>
-        resolve(response),
-      );
+      const timer = setTimeout(() => resolve({ success: false }), 3500);
+      if (!socket.connected) socket.connect();
+      socket.emit("toggleAiSetting", enable, (response: any) => {
+        clearTimeout(timer);
+        resolve(response);
+      });
     });
   };
 
@@ -139,6 +190,7 @@ export function useReadingsSocket() {
     findAllReadings,
     removeReading,
     fetchAqiSpikes,
+    fetchAnnouncements,
     broadcastAnnouncement,
     getAiSetting, // <-- Exported
     toggleAiSetting, // <-- Exported
@@ -151,6 +203,7 @@ export function useReadingsSocket() {
     latestSpike,
     latestSensorStatusAlert,
     latestDeviceAlert,
+    latestAnnouncement,
     systemNotification,
   };
 }
