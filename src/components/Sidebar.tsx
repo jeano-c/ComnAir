@@ -1,279 +1,156 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { motion, Variants } from "framer-motion";
-import { useLocation, Link, href } from "react-router";
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useLocation, Link } from "react-router";
 import { MdOutlineDashboard } from "react-icons/md";
-import { IoBarChartOutline, IoSettingsOutline } from "react-icons/io5";
 import { CiCreditCard1 } from "react-icons/ci";
-import { FaRegQuestionCircle } from "react-icons/fa";
-import { HiOutlineX } from "react-icons/hi";
-import Header from "./Header";
-import { IoDocumentTextOutline } from "react-icons/io5";
-import { IoMegaphoneOutline } from "react-icons/io5";
-
+import { IoDocumentTextOutline, IoMegaphoneOutline, IoLogOutOutline } from "react-icons/io5";
 import { BiCategoryAlt } from "react-icons/bi";
+import { LuPanelLeftClose, LuPanelLeftOpen } from "react-icons/lu";
+import Header from "./Header";
+import { useAuth } from "../hooks/useAuth";
 
-function Sidebar({ children }: { children?: React.ReactNode }) {
-  const MIN_WIDTH = 200;
-  const MAX_WIDTH = 480;
-  const MemoChildren = useMemo(
-    () => (
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">{children}</div>
-    ),
-    [children],
-  );
-
+export default function Sidebar({ children }: { children?: React.ReactNode }) {
   const location = useLocation();
   const activePath = location.pathname;
+  const { logout } = useAuth();
 
-  const [isOpen, setIsOpen] = useState(() => {
+  const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
-      const savedState = localStorage.getItem("openSidebar");
-      if (savedState !== null) return savedState === "true";
+      const saved = localStorage.getItem("sidebar_collapsed");
+      if (saved !== null) return saved === "true";
     }
-    return true;
+    return false;
   });
-
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    if (typeof window !== "undefined") {
-      const savedWidth = localStorage.getItem("sidebarWidth");
-      if (savedWidth !== null) {
-        const parsedWidth = parseInt(savedWidth, 10);
-        if (!isNaN(parsedWidth)) return parsedWidth;
-      }
-    }
-    return 260;
-  });
-
-  const [isResizing, setIsResizing] = useState(false);
-
-  useEffect(
-    () => localStorage.setItem("openSidebar", isOpen.toString()),
-    [isOpen],
-  );
-  useEffect(
-    () => localStorage.setItem("sidebarWidth", sidebarWidth.toString()),
-    [sidebarWidth],
-  );
-
-  const startResizing = useCallback(() => setIsResizing(true), []);
-  const stopResizing = useCallback(() => setIsResizing(false), []);
-
-  const resizeRef = React.useRef<number | null>(null);
-
-  const sidebarRef = React.useRef<HTMLElement>(null);
-
-  const resize = useCallback(
-    (mouseMoveEvent: MouseEvent) => {
-      if (!isResizing) return;
-      if (resizeRef.current) cancelAnimationFrame(resizeRef.current);
-
-      resizeRef.current = requestAnimationFrame(() => {
-        const newWidth = mouseMoveEvent.clientX;
-        if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
-          // Mutate DOM directly — zero re-renders
-          if (sidebarRef.current) {
-            sidebarRef.current.style.width = `${newWidth}px`;
-          }
-          setSidebarWidth(newWidth); // keep for persistence only
-        }
-      });
-    },
-    [isResizing],
-  );
 
   useEffect(() => {
-    if (isResizing) {
-      window.addEventListener("mousemove", resize);
-      window.addEventListener("mouseup", stopResizing);
-      document.body.style.userSelect = "none";
-    } else {
-      document.body.style.userSelect = "auto";
-    }
-    return () => {
-      window.removeEventListener("mousemove", resize);
-      window.removeEventListener("mouseup", stopResizing);
-    };
-  }, [isResizing, resize, stopResizing]);
+    localStorage.setItem("sidebar_collapsed", isCollapsed.toString());
+  }, [isCollapsed]);
 
-  const mainMenuItems = [
+  const menuItems = [
     {
-      icon: <MdOutlineDashboard className="w-5 h-5" />,
+      icon: <MdOutlineDashboard className="w-5 h-5 shrink-0" />,
       label: "Dashboard",
       href: "/",
+      isActive: activePath === "/" || activePath.startsWith("/station/"),
     },
     {
-      icon: <IoBarChartOutline className="w-5 h-5" />,
-      label: "Analytics",
-      href: "/analytics",
-    },
-    {
-      icon: <CiCreditCard1 className="w-5 h-5" />,
+      icon: <CiCreditCard1 className="w-5 h-5 shrink-0" />,
       label: "AQI Guide",
       href: "/aqi",
+      isActive: activePath === "/aqi",
     },
     {
-      icon: <IoDocumentTextOutline className="w-5 h-5" />,
-      label: "Reports",
-      href: "/reports",
-    },
-    {
-      icon: <BiCategoryAlt className="w-5 h-5" />,
+      icon: <BiCategoryAlt className="w-5 h-5 shrink-0" />,
       label: "Categories",
       href: "/category",
+      isActive: activePath === "/category",
     },
     {
-      icon: <IoMegaphoneOutline className="w-5 h-5" />,
+      icon: <IoDocumentTextOutline className="w-5 h-5 shrink-0" />,
+      label: "Reports",
+      href: "/reports",
+      isActive: activePath.startsWith("/reports"),
+    },
+    {
+      icon: <IoMegaphoneOutline className="w-5 h-5 shrink-0" />,
       label: "Announcements",
       href: "/notification",
+      isActive: activePath === "/notification",
     },
   ];
-
-  const bottomMenuItems = [
-    {
-      icon: <IoSettingsOutline className="w-5 h-5" />,
-      label: "Create an Account",
-      href: "/signup",
-    },
-  ];
-
-  const itemVariants: Variants = {
-    open: (i: number) => ({
-      opacity: 1,
-      x: 0,
-      transition: {
-        delay: i * 0.03,
-        type: "tween",
-        ease: "easeOut",
-        duration: 0.25,
-      },
-    }),
-    closed: { opacity: 0, x: -10, transition: { duration: 0.15 } },
-  };
 
   return (
     <div className="flex h-screen w-full bg-[#f8fafc] font-sans overflow-hidden">
+      {/* --- White Animated Collapsible Sidebar --- */}
       <motion.aside
         initial={false}
-        animate={{ width: isOpen ? sidebarWidth : 0 }}
-        transition={
-          isResizing
-            ? { duration: 0 }
-            : { type: "tween", ease: "easeInOut", duration: 0.3 }
-        }
-        style={{ willChange: "width" }}
-        className="bg-[#1F8F22] text-white shrink-0 h-full flex flex-col z-20 overflow-hidden relative"
+        animate={{ width: isCollapsed ? 76 : 240 }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className="bg-white border-r border-gray-100 shrink-0 h-full flex flex-col z-30 shadow-xs relative select-none"
       >
-        <div
-          style={{ width: sidebarWidth }}
-          className="h-full flex flex-col pt-6 pb-6 relative z-10"
-        >
-          <div className="px-6 flex items-center justify-between mb-8">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 flex items-center justify-center">
-                <img
-                  src="/imgs/logowhite.png"
-                  alt="ComnAir Logo"  
-                  className="w-full h-full object-contain" // Forces image to fit the 7x7 box
-                />
-              </div>
-              <span className="font-bold text-2xl tracking-wide">ComnAir</span>
+        <div className={`flex items-center py-4 border-b border-gray-100 ${isCollapsed ? "justify-center px-2" : "justify-between px-5"}`}>
+          {!isCollapsed && (
+            <div className="w-36 h-12 overflow-hidden flex items-center justify-center shrink-0">
+              {/* ComnAir logo at width 36 with vertical transparent padding cropped */}
+              <img
+                src="/imgs/comnairlogo.png"
+                alt="ComnAir Logo"
+                className="w-36 h-36 shrink-0 object-contain select-none"
+              />
             </div>
-            <motion.button
-              onClick={() => setIsOpen(false)}
-              className="px-1.5 py-1 rounded-md hover:bg-white/20 transition-colors"
-            >
-              <HiOutlineX className="text-2xl cursor-pointer" />
-            </motion.button>
-          </div>
+          )}
 
-          <hr className="w-full h-1.5 text-[#ADAFAA] mb-4 rounded-full" />
-
-          <nav className="space-y-2 flex-1 mt-2">
-            {mainMenuItems.map((item, i) => {
-              const isActive = activePath === item.href;
-              return (
-                <motion.div
-                  key={i}
-                  custom={i}
-                  initial="closed"
-                  animate={isOpen ? "open" : "closed"}
-                  variants={itemVariants}
-                >
-                  <Link
-                    to={item.href}
-                    className={`flex items-center gap-4 py-3 pl-6 transition-all duration-200 group border-l-4 ${isActive ? "border-white text-white font-semibold bg-white/10" : "border-transparent text-white/80 hover:bg-white/5 hover:text-white"}`}
-                  >
-                    <div
-                      className={`shrink-0 transition-transform duration-200 ${!isActive && "group-hover:scale-110"}`}
-                    >
-                      {item.icon}
-                    </div>
-                    <span className="text-[15px]">{item.label}</span>
-                  </Link>
-                </motion.div>
-              );
-            })}
-          </nav>
-
-          <div className="h-px bg-white/20 mx-6 mb-4 mt-6"></div>
-
-          <nav className="space-y-2">
-            {bottomMenuItems.map((item, i) => {
-              const isActive = activePath === item.href;
-              return (
-                <motion.div
-                  key={i}
-                  custom={mainMenuItems.length + i}
-                  initial="closed"
-                  animate={isOpen ? "open" : "closed"}
-                  variants={itemVariants}
-                >
-                  <Link
-                    to={item.href}
-                    className={`flex items-center gap-4 py-3 pl-6 transition-all duration-200 group border-l-4 ${isActive ? "border-white text-white font-semibold bg-white/10" : "border-transparent text-white/80 hover:bg-white/5 hover:text-white"}`}
-                  >
-                    <div
-                      className={`shrink-0 transition-transform duration-200 ${!isActive && "group-hover:scale-110"}`}
-                    >
-                      {item.icon}
-                    </div>
-                    <span className="text-[15px]">{item.label}</span>
-                  </Link>
-                </motion.div>
-              );
-            })}
-          </nav>
+          {/* Little icon toggle button beside logo */}
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition cursor-pointer"
+            title={isCollapsed ? "Expand sidebar" : "Minimize sidebar"}
+          >
+            {isCollapsed ? (
+              <LuPanelLeftOpen className="w-5 h-5 text-gray-500" />
+            ) : (
+              <LuPanelLeftClose className="w-5 h-5 text-gray-500" />
+            )}
+          </button>
         </div>
 
-        {isOpen && (
-          <div
-            onMouseDown={startResizing}
-            className="absolute top-0 right-0 h-full w-2 cursor-col-resize z-50 hover:bg-white/20 transition-colors"
-          />
-        )}
+        {/* Navigation Items */}
+        <nav className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto overflow-x-hidden">
+          {menuItems.map((item) => {
+            return (
+              <Link
+                key={item.label}
+                to={item.href}
+                title={isCollapsed ? item.label : undefined}
+                className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 group ${
+                  item.isActive
+                    ? "bg-[#22c55e] text-white shadow-xs"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                } ${isCollapsed ? "justify-center px-0" : ""}`}
+              >
+                <div className={`shrink-0 transition-transform ${!item.isActive && "group-hover:scale-105"}`}>
+                  {item.icon}
+                </div>
+                {!isCollapsed && (
+                  <span className="whitespace-nowrap tracking-wide">{item.label}</span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Bottom Section: Divider & Logout */}
+        <div className="p-3 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={logout}
+            title={isCollapsed ? "Logout" : undefined}
+            className={`flex items-center gap-3.5 w-full px-3.5 py-2.5 rounded-xl font-semibold text-sm text-gray-600 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer group ${
+              isCollapsed ? "justify-center px-0" : ""
+            }`}
+          >
+            <div className="shrink-0 transition-transform group-hover:scale-105">
+              <IoLogOutOutline className="w-5 h-5" />
+            </div>
+            {!isCollapsed && <span className="whitespace-nowrap">Logout</span>}
+          </button>
+        </div>
       </motion.aside>
 
       {/* --- Main Content Area --- */}
-      <main className="flex-1 relative flex flex-col min-w-0 z-10 bg-[#f8fafc]">
-        {isOpen && (
-          <div className="absolute left-0 top-0 bottom-0 w-12 bg-[#1F8F22] -z-10" />
-        )}
+      <main className="flex-1 flex flex-col min-w-0 bg-[#f8fafc] overflow-hidden">
+        {/* Top Header */}
+        <Header
+          isSidebarOpen={!isCollapsed}
+          toggleSidebar={() => setIsCollapsed(!isCollapsed)}
+        />
 
-        <div
-          className={`bg-[#f8fafc] w-full h-full flex flex-col shadow-2xl overflow-hidden relative z-10 transition-all duration-300 ${isOpen ? "rounded-l-4xl rounded-r-xl" : "rounded-none"}`}
-        >
-          {/* INJECTED HEADER COMPONENT */}
-          <Header
-            isSidebarOpen={isOpen}
-            toggleSidebar={() => setIsOpen(true)}
-          />
-
-          {/* Actual page content wrapper */}
-          {MemoChildren}
+        {/* Page Content */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f8fafc]">
+          {children}
         </div>
       </main>
     </div>
   );
 }
-
-export default Sidebar;

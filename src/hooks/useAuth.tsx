@@ -11,7 +11,7 @@ export function useAuth() {
     queryFn: authApi.getProfile,
     refetchOnWindowFocus: false,
   });
-  
+
   const login = useMutation({
     mutationFn: authApi.login,
     onSuccess: async (data) => {
@@ -31,6 +31,20 @@ export function useAuth() {
     mutationFn: authApi.register,
   });
 
+  const updateProfile = useMutation({
+    mutationFn: authApi.updateProfile,
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(["authUser"], (old: any) => ({
+        ...old,
+        ...updatedUser,
+      }));
+    },
+  });
+
+  const changePassword = useMutation({
+    mutationFn: authApi.changePassword,
+  });
+
   return {
     user,
     isAuthenticated: !!user,
@@ -41,6 +55,12 @@ export function useAuth() {
 
     register: register.mutateAsync,
     isRegistering: register.isPending,
+
+    updateProfile: updateProfile.mutateAsync,
+    isUpdatingProfile: updateProfile.isPending,
+
+    changePassword: changePassword.mutateAsync,
+    isChangingPassword: changePassword.isPending,
 
     logout,
   };
