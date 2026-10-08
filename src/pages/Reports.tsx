@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { CiCalendar } from "react-icons/ci";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 // Make sure this path matches where your hooks are located
 import { useReports, useDuplicates } from "../hooks/useReports";
 import { VscLoading } from "react-icons/vsc";
 import { MdOutlineDifference } from "react-icons/md";
+import { IoChevronBack, IoChevronForward } from "react-icons/io5";
+import ReportCategories from "./ReportCategories";
 
 const censorEmail = (email: string) => {
   if (!email || !email.includes("@")) return email || "Anonymous";
@@ -14,16 +16,36 @@ const censorEmail = (email: string) => {
   return `${maskedName}@${domain}`;
 };
 
+const getPageNumbers = (current: number, total: number) => {
+  if (total <= 5) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 3) {
+    return [1, 2, 3, 4, 5];
+  }
+  if (current >= total - 2) {
+    return [total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [current - 2, current - 1, current, current + 1, current + 2];
+};
+
 function Reports() {
-  const labels = ["All Reports", "New", "Under Review", "Resolve"];
-  const [activeLabel, setActiveLabel] = useState("All Reports");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+
+  const labels = ["All Reports", "New", "Under Review", "Resolve", "Categories"];
+  const [activeLabel, setActiveLabel] = useState(() => {
+    return tabParam === "Categories" ? "Categories" : "All Reports";
+  });
 
   // Toggle between standard view and duplicates view
   const [isDuplicateView, setIsDuplicateView] = useState(false);
 
-  const pageSize = 20;
+  // Pagination state (12 cards per page: 3 rows of 4)
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
-  // Standard Reports Hook (Infinite Scroll)
+  // Standard Reports Hook
   const {
     reportsData,
     isLoading: isReportsLoading,
@@ -31,7 +53,7 @@ function Reports() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useReports(pageSize);
+  } = useReports(100);
 
   // Optimized Duplicates Hook (Only fetches when isDuplicateView is true)
   const {
@@ -40,24 +62,29 @@ function Reports() {
     isError: isDuplicatesError,
   } = useDuplicates(isDuplicateView);
 
-  const observerTarget = useRef(null);
-
-  // Infinite Scroll Observer (Only active on Standard View)
+  // Sync tab query parameter if URL updates
   useEffect(() => {
-    if (isDuplicateView) return; // Disable infinite scroll on duplicates view
+    if (tabParam === "Categories") {
+      setActiveLabel("Categories");
+    }
+  }, [tabParam]);
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 0.1 },
-    );
+  // Background fetch remaining pages from server if any exist
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
 
-    if (observerTarget.current) observer.observe(observerTarget.current);
-    return () => observer.disconnect();
-  }, [hasNextPage, fetchNextPage, isFetchingNextPage, isDuplicateView]);
+  const handleLabelChange = (item: string) => {
+    setActiveLabel(item);
+    setCurrentPage(1);
+    if (item === "Categories") {
+      setSearchParams({ tab: "Categories" });
+    } else {
+      setSearchParams({});
+    }
+  };
 
   if (isReportsLoading || (isDuplicateView && isDuplicatesLoading)) {
     return (
@@ -82,6 +109,7 @@ function Reports() {
 
   // Filter Standard Reports
   const filteredReports = reportsData.filter((report: any) => {
+    if (activeLabel === "Categories") return false;
     if (activeLabel === "All Reports") return true;
     if (activeLabel === "Resolve") return report.resolve === true;
     return (
@@ -89,6 +117,13 @@ function Reports() {
       !report.resolve
     );
   });
+
+  // Calculate pagination
+  const totalPages = Math.max(1, Math.ceil(filteredReports.length / itemsPerPage));
+  const paginatedReports = filteredReports.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   // Filter Clusters (Only show clusters with actual duplicates, size > 1)
   const actualDuplicates =
@@ -99,24 +134,10 @@ function Reports() {
       {/* --- Header & Filters --- */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10 py-3.5">
         <h1 className="text-2xl md:text-3xl font-bold text-[#1a1a1a]">
-          Active Reports
+          {activeLabel === "Categories" ? "Report Categories" : "Active Reports"}
         </h1>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
-          {/* Action Button: Find Duplicates */}
-          {/* <button
-            onClick={() => setIsDuplicateView(!isDuplicateView)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all duration-200 active:scale-95 w-full sm:w-auto justify-center border-2
-              ${
-                isDuplicateView
-                  ? "bg-[#1F8F22] text-white border-[#1F8F22] shadow-lg shadow-[#1F8F22]/30"
-                  : "bg-white text-gray-700 border-gray-200 hover:border-[#1F8F22]/50 hover:text-[#1F8F22]"
-              }`}
-          >
-            <MdOutlineDifference className="text-lg" />
-            {isDuplicateView ? "Exit Duplicate View" : "Find Duplicates"}
-          </button> */}
-
           <div className="w-px h-8 bg-gray-300 hidden sm:block"></div>
 
           {/* Standard Filters (Disabled in Duplicate View to avoid confusion) */}
@@ -126,7 +147,7 @@ function Reports() {
             {labels.map((item, index) => (
               <button
                 key={index}
-                onClick={() => setActiveLabel(item)}
+                onClick={() => handleLabelChange(item)}
                 className={`px-5 py-2.5 rounded-full cursor-pointer text-sm font-semibold transition-all duration-200 active:scale-95 grow sm:grow-0
                   ${
                     activeLabel === item
@@ -142,7 +163,9 @@ function Reports() {
       </div>
 
       {/* --- View Rendering --- */}
-      {isDuplicateView ? (
+      {activeLabel === "Categories" ? (
+        <ReportCategories embedded={true} />
+      ) : isDuplicateView ? (
         /* === DUPLICATES VIEW === */
         <div className="flex flex-col gap-6 pb-10">
           <div className="bg-[#1F8F22]/10 border border-[#1F8F22]/30 rounded-xl p-4 text-[#1F8F22] font-medium text-sm mb-4 flex items-center gap-3">
@@ -239,86 +262,125 @@ function Reports() {
       ) : (
         /* === STANDARD GRID VIEW === */
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-10 py-2.5">
-            {filteredReports.map((item: any) => (
-              <Link to={`${item.id}`} key={item.id} className="block group">
-                <div
-                  className={`
-                  h-72 flex flex-col justify-between p-6 rounded-2xl border-2 transition-all duration-300 cursor-pointer
-                  ${
-                    item.resolve
-                      ? "bg-gray-50/80 border-gray-200 opacity-75 hover:opacity-100"
-                      : "bg-white border-transparent hover:border-[#1F8F22]/40 shadow-sm hover:shadow-xl hover:-translate-y-1"
-                  }
-                `}
-                >
-                  <div className="overflow-hidden">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span
-                        className={`w-2.5 h-2.5 rounded-full shrink-0 ${item.resolve ? "bg-green-400" : "bg-amber-400 animate-pulse"}`}
-                      ></span>
-                      <span
-                        className={`text-[10px] font-bold tracking-wider uppercase ${
-                          item.resolve ? "text-[#1F8F22]" : "text-amber-600"
-                        }`}
-                      >
-                        {item.resolve ? "Resolved" : item.status}
-                      </span>
-                    </div>
-
-                    <h3
-                      className={`font-bold text-lg leading-tight line-clamp-2 tracking-wide transition-colors ${
+          {filteredReports.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-gray-200 border-dashed">
+              <p className="text-center text-gray-500 font-medium">
+                No reports found in this category.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-6 py-2.5">
+                {paginatedReports.map((item: any) => (
+                  <Link to={`${item.id}`} key={item.id} className="block group">
+                    <div
+                      className={`
+                      h-72 flex flex-col justify-between p-6 rounded-2xl border-2 transition-all duration-300 cursor-pointer
+                      ${
                         item.resolve
-                          ? "text-gray-500 line-through decoration-gray-300"
-                          : "text-[#1a1a1a] group-hover:text-[#1F8F22]"
+                          ? "bg-gray-50/80 border-gray-200 opacity-75 hover:opacity-100"
+                          : "bg-white border-transparent hover:border-[#1F8F22]/40 shadow-sm hover:shadow-xl hover:-translate-y-1"
+                      }
+                    `}
+                    >
+                      <div className="overflow-hidden">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span
+                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${item.resolve ? "bg-green-400" : "bg-amber-400 animate-pulse"}`}
+                          ></span>
+                          <span
+                            className={`text-[10px] font-bold tracking-wider uppercase ${
+                              item.resolve ? "text-[#1F8F22]" : "text-amber-600"
+                            }`}
+                          >
+                            {item.resolve ? "Resolved" : item.status}
+                          </span>
+                        </div>
+
+                        <h3
+                          className={`font-bold text-lg leading-tight line-clamp-2 tracking-wide transition-colors ${
+                            item.resolve
+                              ? "text-gray-500 line-through decoration-gray-300"
+                              : "text-[#1a1a1a] group-hover:text-[#1F8F22]"
+                          }`}
+                        >
+                          {item.title}
+                        </h3>
+
+                        <p className="text-gray-500 text-sm mt-3 leading-relaxed line-clamp-3">
+                          {item.content}
+                        </p>
+                      </div>
+
+                      <div className="mt-6 pt-4 border-t border-gray-100 flex flex-row justify-between items-center gap-3 flex-wrap">
+                        <div className="flex flex-row items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-[linear-gradient(270deg,rgba(146,146,146,0.7)_0%,rgba(31,143,34,0.7)_64%,rgba(9,70,10,0.7)_100%)] text-white flex items-center justify-center font-bold text-xs shadow-sm shrink-0">
+                            {item.email ? item.email[0].toUpperCase() : "?"}
+                          </div>
+                          <span className="text-sm text-gray-700 font-medium truncate">
+                            {censorEmail(item.email)}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-row justify-between items-center text-gray-400 text-xs font-medium shrink-0">
+                          <div className="flex items-center gap-1.5">
+                            <CiCalendar className="text-base" />
+                            <time>
+                              {new Date(item.createdAt).toLocaleDateString()}
+                            </time>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              {/* --- Pagination Bar (Matching uploaded image with red active page) --- */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 pb-12 border-t border-gray-100 mt-6">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="w-9 h-9 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition shadow-2xs cursor-pointer"
+                    title="Previous Page"
+                  >
+                    <IoChevronBack className="text-sm" />
+                  </button>
+
+                  {getPageNumbers(currentPage, totalPages).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setCurrentPage(p)}
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-semibold transition cursor-pointer shadow-2xs ${
+                        currentPage === p
+                          ? "bg-[#34CB5A] text-white font-bold"
+                          : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
-                      {item.title}
-                    </h3>
+                      {p}
+                    </button>
+                  ))}
 
-                    <p className="text-gray-500 text-sm mt-3 leading-relaxed line-clamp-3">
-                      {item.content}
-                    </p>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-gray-100 flex flex-row justify-between items-center gap-3 flex-wrap">
-                    <div className="flex flex-row items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-[linear-gradient(270deg,rgba(146,146,146,0.7)_0%,rgba(31,143,34,0.7)_64%,rgba(9,70,10,0.7)_100%)] text-white flex items-center justify-center font-bold text-xs shadow-sm shrink-0">
-                        {item.email ? item.email[0].toUpperCase() : "?"}
-                      </div>
-                      <span className="text-sm text-gray-700 font-medium truncate">
-                        {censorEmail(item.email)}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-row justify-between items-center text-gray-400 text-xs font-medium shrink-0">
-                      <div className="flex items-center gap-1.5">
-                        <CiCalendar className="text-base" />
-                        <time>
-                          {new Date(item.createdAt).toLocaleDateString()}
-                        </time>
-                      </div>
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="w-9 h-9 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition shadow-2xs cursor-pointer"
+                    title="Next Page"
+                  >
+                    <IoChevronForward className="text-sm" />
+                  </button>
                 </div>
-              </Link>
-            ))}
-          </div>
 
-          <div ref={observerTarget} className="flex justify-center pb-10">
-            {isFetchingNextPage && (
-              <span className="text-[#1F8F22] font-medium tracking-wide animate-pulse flex items-center gap-2 text-sm">
-                <VscLoading className="animate-spin text-xl" />
-                Loading more reports...
-              </span>
-            )}
-
-            {!hasNextPage && reportsData.length > 0 && (
-              <span className="text-gray-400 text-sm font-medium">
-                You've reached the end!
-              </span>
-            )}
-          </div>
+                <span className="text-xs text-gray-500 font-medium">
+                  Page {currentPage} of {totalPages} of Reports
+                </span>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

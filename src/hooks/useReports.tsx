@@ -1,9 +1,9 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { reports } from "../api/reports";
 
-export function useReports(pageSize: number = 20) {
+export function useReports(pageSize: number = 100) {
   const query = useInfiniteQuery({
-    queryKey: ["reports"],
+    queryKey: ["reports", pageSize],
     queryFn: ({ pageParam = 1 }) => reports.getAll(pageParam, pageSize),
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => {

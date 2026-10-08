@@ -21,6 +21,7 @@ import AqiNotifications from "./components/AqiNotifications";
 import SpikeDrawer from "./components/SpikeDrawer";
 import Profile from "./pages/Profile";
 import StationDetails from "./pages/StationDetails";
+import AdminManual from "./pages/AdminManual";
 
 function Layout() {
   return (
@@ -101,8 +102,9 @@ const router = createBrowserRouter([
         element: <SpikesPage />,
       },
 
-      { path: "category", element: <ReportCategories /> },
+      { path: "category", element: <Navigate to="/reports?tab=Categories" replace /> },
       { path: "profile", element: <Profile /> },
+      { path: "manual", element: <AdminManual /> },
       { path: "station/:id", element: <StationDetails /> },
       { path: "test", element: <Dashboard /> },
     ],
