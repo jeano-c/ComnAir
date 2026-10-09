@@ -1,4 +1,5 @@
 import React from "react";
+import GenericAqiAiTipCard from "../components/GenericAqiAiTipCard";
 
 // Official EPA AQI scale colors, descriptions, and health messages
 const aqiScale = [
@@ -60,6 +61,9 @@ function Aqi() {
   return (
     <div className="min-h-screen bg-[#F4F4F9] p-4 sm:p-6 md:p-12 lg:p-16 flex justify-center font-sans">
       <div className="max-w-7xl w-full flex flex-col">
+        {/* --- Dynamic AI Spike & Pollutant Advisory Banner --- */}
+        <GenericAqiAiTipCard />
+
         {/* --- Header Section --- */}
         <div className="mb-12 text-center md:text-left">
           <div className="inline-block bg-white shadow-sm text-gray-700 text-xs font-bold px-5 py-2 rounded-full mb-6 tracking-widest uppercase border border-gray-200">
