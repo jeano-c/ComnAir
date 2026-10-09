@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, Link } from "react-router";
 import { MdOutlineDashboard } from "react-icons/md";
 import { CiCreditCard1 } from "react-icons/ci";
-import { IoDocumentTextOutline, IoMegaphoneOutline, IoLogOutOutline } from "react-icons/io5";
-import { BiCategoryAlt } from "react-icons/bi";
+import { IoDocumentTextOutline, IoMegaphoneOutline, IoLogOutOutline, IoPersonAddOutline, IoBookOutline } from "react-icons/io5";
 import { LuPanelLeftClose, LuPanelLeftOpen } from "react-icons/lu";
 import Header from "./Header";
 import { useAuth } from "../hooks/useAuth";
@@ -40,12 +39,6 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
       isActive: activePath === "/aqi",
     },
     {
-      icon: <BiCategoryAlt className="w-5 h-5 shrink-0" />,
-      label: "Categories",
-      href: "/category",
-      isActive: activePath === "/category",
-    },
-    {
       icon: <IoDocumentTextOutline className="w-5 h-5 shrink-0" />,
       label: "Reports",
       href: "/reports",
@@ -56,6 +49,12 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
       label: "Announcements",
       href: "/notification",
       isActive: activePath === "/notification",
+    },
+    {
+      icon: <IoBookOutline className="w-5 h-5 shrink-0" />,
+      label: "Admin Manual",
+      href: "/manual",
+      isActive: activePath === "/manual",
     },
   ];
 
@@ -120,8 +119,23 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Bottom Section: Divider & Logout */}
-        <div className="p-3 border-t border-gray-100">
+        {/* Bottom Section: Create an Account & Logout */}
+        <div className="p-3 border-t border-gray-100 space-y-1">
+          <Link
+            to="/signup"
+            title={isCollapsed ? "Create an Account" : undefined}
+            className={`flex items-center gap-3.5 w-full px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 group ${
+              activePath === "/signup"
+                ? "bg-[#22c55e] text-white shadow-xs"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+            } ${isCollapsed ? "justify-center px-0" : ""}`}
+          >
+            <div className={`shrink-0 transition-transform ${activePath !== "/signup" && "group-hover:scale-105"}`}>
+              <IoPersonAddOutline className="w-5 h-5" />
+            </div>
+            {!isCollapsed && <span className="whitespace-nowrap">Create an Account</span>}
+          </Link>
+
           <button
             type="button"
             onClick={logout}
