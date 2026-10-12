@@ -4,9 +4,12 @@ import {
   IoChevronBack,
   IoCalendarOutline,
   IoChevronDown,
+  IoCheckmarkOutline,
+  IoRefreshOutline,
+  IoClose,
 } from "react-icons/io5";
 import { MdMoreVert } from "react-icons/md";
-import { LuDownload } from "react-icons/lu";
+import { LuDownload, LuFileSpreadsheet } from "react-icons/lu";
 import { jsPDF } from "jspdf";
 import { socket } from "../api/socket";
 import { location as locationApi } from "../api/location";
@@ -155,13 +158,17 @@ export default function StationDetails() {
 
   // Date and Range Dropdown State (Real current date)
   const today = useMemo(() => new Date(), []);
-  const [selectedDate, setSelectedDate] = useState<Date>(today);
+  const [startDate, setStartDate] = useState<Date | null>(today);
+  const [endDate, setEndDate] = useState<Date | null>(today);
+  const [hoverDate, setHoverDate] = useState<Date | null>(null);
+  const [isRangeMode, setIsRangeMode] = useState<boolean>(false);
   const [selectedRange, setSelectedRange] = useState<string>("Today");
   const [dateLabel, setDateLabel] = useState<string>(formatDate(today));
 
   // Dropdown visibility
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isRangeOpen, setIsRangeOpen] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
   // Calendar month view initialized to current month
   const [calendarMonth, setCalendarMonth] = useState<Date>(
@@ -170,6 +177,7 @@ export default function StationDetails() {
 
   const calendarRef = useRef<HTMLDivElement>(null);
   const rangeRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
 
   // 1. Fetch live data from backend socket & API
   useEffect(() => {
@@ -229,14 +237,32 @@ export default function StationDetails() {
       const target = e.target as Node;
       if (calendarRef.current && !calendarRef.current.contains(target)) {
         setIsCalendarOpen(false);
+        // If calendar closed while in range mode without completing range, fallback safely
+        setStartDate((curStart) => {
+          setEndDate((curEnd) => {
+            if (!curStart && !curEnd) {
+              return today;
+            }
+            if (curStart && !curEnd) {
+              setDateLabel(formatDate(curStart));
+              setSelectedRange(curStart.toDateString() === today.toDateString() ? "Today" : "Custom");
+              return curStart;
+            }
+            return curEnd;
+          });
+          return curStart || today;
+        });
       }
       if (rangeRef.current && !rangeRef.current.contains(target)) {
         setIsRangeOpen(false);
       }
+      if (exportRef.current && !exportRef.current.contains(target)) {
+        setIsExportMenuOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [today]);
 
   // 2. Identify the active station
   const activeStation = useMemo(() => {
@@ -288,6 +314,10 @@ export default function StationDetails() {
   const filteredReadings = useMemo(() => {
     if (!stationReadings.length) return [];
 
+    if (selectedRange === "All Time") {
+      return stationReadings;
+    }
+
     if (selectedRange === "Today") {
       const todayString = today.toDateString();
       const todayMatches = stationReadings.filter(
@@ -304,75 +334,97 @@ export default function StationDetails() {
       );
     }
 
-    if (selectedRange === "Last 7 Days") {
-      const cutoff = new Date(today);
-      cutoff.setDate(cutoff.getDate() - 7);
-      cutoff.setHours(0, 0, 0, 0);
-      return stationReadings.filter((r) => new Date(r.timestamp) >= cutoff);
-    }
+    // Filter between startDate (00:00:00) and endDate (23:59:59.999)
+    const effectiveStart = startDate ? new Date(startDate) : new Date(today);
+    effectiveStart.setHours(0, 0, 0, 0);
 
-    if (selectedRange === "Last 30 Days") {
-      const cutoff = new Date(today);
-      cutoff.setDate(cutoff.getDate() - 30);
-      cutoff.setHours(0, 0, 0, 0);
-      return stationReadings.filter((r) => new Date(r.timestamp) >= cutoff);
-    }
+    const effectiveEnd = endDate ? new Date(endDate) : new Date(effectiveStart);
+    effectiveEnd.setHours(23, 59, 59, 999);
 
-    if (selectedRange === "All Time") {
-      return stationReadings;
-    }
+    const minTime = Math.min(effectiveStart.getTime(), effectiveEnd.getTime());
+    const maxTime = Math.max(effectiveStart.getTime(), effectiveEnd.getTime());
 
-    // Custom single date selected
-    const selectedString = selectedDate.toDateString();
-    return stationReadings.filter(
-      (r) => new Date(r.timestamp).toDateString() === selectedString
-    );
-  }, [stationReadings, selectedRange, selectedDate, today]);
+    return stationReadings.filter((r) => {
+      const t = new Date(r.timestamp).getTime();
+      return t >= minTime && t <= maxTime;
+    });
+  }, [stationReadings, selectedRange, startDate, endDate, today]);
 
   // Check if active view is "Today" (real-time mode)
   const isTodayActive = useMemo(() => {
     if (selectedRange === "Today") return true;
     if (
-      selectedRange === "Custom" &&
-      selectedDate.getDate() === today.getDate() &&
-      selectedDate.getMonth() === today.getMonth() &&
-      selectedDate.getFullYear() === today.getFullYear()
+      startDate &&
+      endDate &&
+      startDate.toDateString() === today.toDateString() &&
+      endDate.toDateString() === today.toDateString()
     ) {
       return true;
     }
     return false;
-  }, [selectedRange, selectedDate, today]);
+  }, [selectedRange, startDate, endDate, today]);
 
-  // Compute daily / period averages for each pollutant on past dates
-  const pollutantAverages = useMemo(() => {
+  // Detect whether the selected view spans across multiple days
+  const isMultiDayRange = useMemo(() => {
+    if (
+      selectedRange === "Last 7 Days" ||
+      selectedRange === "Last 30 Days" ||
+      selectedRange === "All Time"
+    ) {
+      return true;
+    }
+    if (startDate && endDate) {
+      return startDate.toDateString() !== endDate.toDateString();
+    }
+    return false;
+  }, [selectedRange, startDate, endDate]);
+
+  // Compute daily / period statistics (avg, min, max) for each pollutant on filtered readings
+  const pollutantStats = useMemo(() => {
     const source = filteredReadings.length > 0 ? filteredReadings : stationReadings;
     if (!source.length) return null;
 
-    const sums: Record<string, { sum: number; count: number }> = {
-      pm25: { sum: 0, count: 0 },
-      so2: { sum: 0, count: 0 },
-      co: { sum: 0, count: 0 },
-      o3: { sum: 0, count: 0 },
-      no2: { sum: 0, count: 0 },
+    const stats: Record<
+      string,
+      { sum: number; count: number; min: number | null; max: number | null; avg: number | null }
+    > = {
+      pm25: { sum: 0, count: 0, min: null, max: null, avg: null },
+      so2: { sum: 0, count: 0, min: null, max: null, avg: null },
+      co: { sum: 0, count: 0, min: null, max: null, avg: null },
+      o3: { sum: 0, count: 0, min: null, max: null, avg: null },
+      no2: { sum: 0, count: 0, min: null, max: null, avg: null },
     };
 
     source.forEach((r) => {
       SENSOR_METRICS.forEach((sensor) => {
         const val = r[sensor.key];
         if (typeof val === "number" && !isNaN(val)) {
-          sums[sensor.key].sum += val;
-          sums[sensor.key].count += 1;
+          const s = stats[sensor.key];
+          s.sum += val;
+          s.count += 1;
+          s.min = s.min === null ? val : Math.min(s.min, val);
+          s.max = s.max === null ? val : Math.max(s.max, val);
         }
       });
     });
 
-    const avgs: Record<string, number | null> = {};
     SENSOR_METRICS.forEach((sensor) => {
-      avgs[sensor.key] = sums[sensor.key].count > 0 ? sums[sensor.key].sum / sums[sensor.key].count : null;
+      const s = stats[sensor.key];
+      s.avg = s.count > 0 ? s.sum / s.count : null;
     });
 
-    return avgs;
+    return stats;
   }, [filteredReadings, stationReadings]);
+
+  // Backward-compatible pollutant averages mapping
+  const pollutantAverages = useMemo(() => {
+    if (!pollutantStats) return null;
+    const avgs: Record<string, number | null> = {};
+    SENSOR_METRICS.forEach((sensor) => {
+      avgs[sensor.key] = pollutantStats[sensor.key]?.avg ?? null;
+    });
+    return avgs;
+  }, [pollutantStats]);
 
   // Latest snapshot reading
   const latestSnapshotReading = useMemo(() => {
@@ -385,7 +437,7 @@ export default function StationDetails() {
     return null;
   }, [filteredReadings, stationReadings]);
 
-  // Active pollutant data: For Today = Latest Reading; For Past Date / Range = Daily Average
+  // Active pollutant data: For Today = Latest Reading; For Past Date / Range = Period Average
   const effectivePollutantData = useMemo(() => {
     if (isTodayActive) {
       return {
@@ -394,61 +446,163 @@ export default function StationDetails() {
         values: latestSnapshotReading || {},
       };
     } else {
+      const isSingleDay =
+        startDate && endDate && startDate.toDateString() === endDate.toDateString();
+      const modeLabel = isSingleDay
+        ? "Daily Avg"
+        : selectedRange === "Custom" || selectedRange === "Custom Range"
+        ? "Range Avg"
+        : `${selectedRange} Avg`;
+
       return {
         isAverage: true,
-        modeLabel: selectedRange === "Custom" ? "Daily Avg" : `${selectedRange} Avg`,
+        modeLabel,
         values: pollutantAverages || {},
       };
     }
-  }, [isTodayActive, latestSnapshotReading, pollutantAverages, selectedRange]);
+  }, [isTodayActive, latestSnapshotReading, pollutantAverages, selectedRange, startDate, endDate]);
 
-  // Overall AQI for the effective reading or daily average
+  // Overall AQI for the effective reading or daily/period average
   const overallAQI = useMemo(() => {
     if (!effectivePollutantData.values) return 0;
     return calculateOverallAQI(effectivePollutantData.values);
   }, [effectivePollutantData]);
 
-  // Handle Range Selection
+  // Handle Preset Range Selection
   const handleSelectRange = (range: string) => {
     setSelectedRange(range);
     setIsRangeOpen(false);
 
     if (range === "Today") {
       setDateLabel(formatDate(today));
-      setSelectedDate(today);
+      setStartDate(today);
+      setEndDate(today);
+      setHoverDate(null);
+      setIsRangeMode(false);
     } else if (range === "Last 7 Days") {
       const past = new Date(today);
       past.setDate(past.getDate() - 7);
+      setStartDate(past);
+      setEndDate(today);
+      setHoverDate(null);
+      setIsRangeMode(true);
       setDateLabel(`${formatDate(past)} - ${formatDate(today)}`);
     } else if (range === "Last 30 Days") {
       const past = new Date(today);
       past.setDate(past.getDate() - 30);
+      setStartDate(past);
+      setEndDate(today);
+      setHoverDate(null);
+      setIsRangeMode(true);
       setDateLabel(`${formatDate(past)} - ${formatDate(today)}`);
     } else if (range === "All Time") {
       if (stationReadings.length > 0) {
         const earliest = new Date(stationReadings[0].timestamp);
+        setStartDate(earliest);
+        setEndDate(today);
+        setHoverDate(null);
+        setIsRangeMode(true);
         setDateLabel(`${formatDate(earliest)} - ${formatDate(today)}`);
       } else {
+        setStartDate(null);
+        setEndDate(null);
+        setHoverDate(null);
+        setIsRangeMode(false);
         setDateLabel(`All Time`);
       }
     }
   };
 
-  // Handle Single Date Click in Calendar
+  // Handle Date Click in Calendar
   const handleSelectCalendarDate = (date: Date) => {
-    setSelectedDate(date);
-    setDateLabel(formatDate(date));
-    setIsCalendarOpen(false);
+    if (!isRangeMode) {
+      // 1-Click Instant Selection for Single Date Mode (Default UX)
+      setStartDate(date);
+      setEndDate(date);
+      setHoverDate(null);
+      setIsCalendarOpen(false);
 
-    if (
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear()
-    ) {
-      setSelectedRange("Today");
-    } else {
-      setSelectedRange("Custom");
+      if (date.toDateString() === today.toDateString()) {
+        setSelectedRange("Today");
+      } else {
+        setSelectedRange("Custom");
+      }
+      setDateLabel(formatDate(date));
+      return;
     }
+
+    // Two-Click Range Selection Mode (Triggered when user clicks "Custom Range")
+    if (!startDate || (startDate && endDate)) {
+      // 1st click: Start a new range selection
+      setStartDate(date);
+      setEndDate(null);
+      setHoverDate(null);
+      setDateLabel(`${formatDate(date)} - ...`);
+    } else {
+      // 2nd click: Complete the range selection
+      let start = startDate;
+      let end = date;
+      if (end.getTime() < start.getTime()) {
+        const tmp = start;
+        start = end;
+        end = tmp;
+      }
+      setStartDate(start);
+      setEndDate(end);
+      setHoverDate(null);
+      setIsCalendarOpen(false);
+
+      if (start.toDateString() === end.toDateString()) {
+        if (start.toDateString() === today.toDateString()) {
+          setSelectedRange("Today");
+          setIsRangeMode(false);
+        } else {
+          setSelectedRange("Custom");
+        }
+        setDateLabel(formatDate(start));
+      } else {
+        setSelectedRange("Custom Range");
+        setDateLabel(`${formatDate(start)} - ${formatDate(end)}`);
+      }
+    }
+  };
+
+  // Helper to determine highlight status for calendar day cells
+  const getDateRangeStatus = (date: Date) => {
+    if (!startDate) {
+      return { isStart: false, isEnd: false, isInRange: false, isSelected: false };
+    }
+
+    const cellTime = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const startTime = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime();
+
+    if (!isRangeMode) {
+      const isSelected = cellTime === startTime;
+      return { isStart: isSelected, isEnd: isSelected, isInRange: false, isSelected };
+    }
+
+    if (endDate) {
+      const endTime = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime();
+      const min = Math.min(startTime, endTime);
+      const max = Math.max(startTime, endTime);
+      const isStart = cellTime === min;
+      const isEnd = cellTime === max;
+      const isInRange = cellTime > min && cellTime < max;
+      return { isStart, isEnd, isInRange, isSelected: isStart || isEnd };
+    }
+
+    // Only start date is clicked so far: preview range with hover date
+    const isStart = cellTime === startTime;
+    if (hoverDate) {
+      const hoverTime = new Date(hoverDate.getFullYear(), hoverDate.getMonth(), hoverDate.getDate()).getTime();
+      const min = Math.min(startTime, hoverTime);
+      const max = Math.max(startTime, hoverTime);
+      const isEnd = cellTime === hoverTime;
+      const isInRange = cellTime > min && cellTime < max;
+      return { isStart, isEnd, isInRange, isSelected: isStart || isEnd };
+    }
+
+    return { isStart, isEnd: false, isInRange: false, isSelected: isStart };
   };
 
   // Generate Calendar Days for popup
@@ -500,7 +654,11 @@ export default function StationDetails() {
       54
     );
     doc.text(
-      `Metric Mode: ${isAvg ? "Daily Average (24h Mean Concentration)" : "Live Telemetry Snapshot (Latest)"} | Points: ${filteredReadings.length}`,
+      `Metric Mode: ${
+        isAvg
+          ? `Period Aggregate Summary (Mean of ${filteredReadings.length} telemetry readings)`
+          : `Live Telemetry Snapshot (${filteredReadings.length} total readings)`
+      }`,
       14,
       60
     );
@@ -509,32 +667,36 @@ export default function StationDetails() {
     doc.line(14, 64, 196, 64);
 
     // Pollutant Metrics Table Header
-    doc.setFontSize(11);
+    doc.setFontSize(9.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
-    doc.text("Pollutant", 14, 73);
-    doc.text(isAvg ? "Daily Avg Concentration" : "Real Concentration", 60, 73);
-    doc.text("Sub-AQI", 115, 73);
-    doc.text("EPA Category", 140, 73);
-    doc.text("Data Source", 170, 73);
+    doc.text("Pollutant", 14, 72);
+    doc.text(isAvg ? "Avg Conc" : "Concentration", 46, 72);
+    doc.text("Min", 78, 72);
+    doc.text("Peak / Max", 100, 72);
+    doc.text("Sub-AQI", 130, 72);
+    doc.text("EPA Category", 152, 72);
+    doc.text("Data Source", 176, 72);
 
-    doc.line(14, 76, 196, 76);
+    doc.line(14, 75, 196, 75);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
+    doc.setFontSize(9);
 
-    let y = 84;
+    let y = 83;
     SENSOR_METRICS.forEach((sensor) => {
-      const val = effectivePollutantData.values[sensor.key];
-      const numVal = typeof val === "number" ? val : null;
+      const pStat = pollutantStats?.[sensor.key];
+      const avgVal = pStat?.avg ?? (typeof effectivePollutantData.values[sensor.key] === "number" ? effectivePollutantData.values[sensor.key] : null);
+      const minVal = pStat?.min ?? avgVal;
+      const maxVal = pStat?.max ?? avgVal;
 
       let subAQI = 0;
-      if (numVal !== null) {
-        if (sensor.key === "pm25") subAQI = calculatePM25AQI(numVal);
-        else if (sensor.key === "so2") subAQI = calculateSO2AQI(numVal);
-        else if (sensor.key === "co") subAQI = calculateCOAQI(numVal);
-        else if (sensor.key === "o3") subAQI = calculateO3AQI(numVal);
-        else if (sensor.key === "no2") subAQI = calculateNO2AQI(numVal);
+      if (avgVal !== null) {
+        if (sensor.key === "pm25") subAQI = calculatePM25AQI(avgVal);
+        else if (sensor.key === "so2") subAQI = calculateSO2AQI(avgVal);
+        else if (sensor.key === "co") subAQI = calculateCOAQI(avgVal);
+        else if (sensor.key === "o3") subAQI = calculateO3AQI(avgVal);
+        else if (sensor.key === "no2") subAQI = calculateNO2AQI(avgVal);
       }
 
       const cat = getAqiCategory(subAQI);
@@ -543,20 +705,22 @@ export default function StationDetails() {
         activeStation.fallbackSensors?.includes(sensor.key);
 
       const sourceStr =
-        numVal === null
+        avgVal === null
           ? "Offline"
           : isFallback
-          ? "Satellite Fallback"
-          : "Hardware Sensor";
+          ? "Satellite"
+          : "Hardware";
 
       doc.setTextColor(30, 41, 59);
       doc.text(sensor.label, 14, y);
       doc.text(
-        numVal !== null ? `${numVal.toFixed(sensor.decimals)} ${sensor.unit}` : "--",
-        60,
+        avgVal !== null ? `${avgVal.toFixed(sensor.decimals)} ${sensor.unit}` : "--",
+        46,
         y
       );
-      doc.text(numVal !== null ? `${subAQI}` : "--", 115, y);
+      doc.text(minVal !== null ? `${minVal.toFixed(sensor.decimals)}` : "--", 78, y);
+      doc.text(maxVal !== null ? `${maxVal.toFixed(sensor.decimals)}` : "--", 100, y);
+      doc.text(avgVal !== null ? `${subAQI}` : "--", 130, y);
 
       if (cat.label === "Hazardous" || cat.label === "Very Unhealthy") {
         doc.setTextColor(159, 18, 57);
@@ -565,19 +729,20 @@ export default function StationDetails() {
       } else {
         doc.setTextColor(22, 163, 74);
       }
-      doc.text(cat.label, 140, y);
+      doc.text(cat.label, 152, y);
 
       doc.setTextColor(100, 116, 139);
-      doc.text(sourceStr, 170, y);
+      doc.text(sourceStr, 176, y);
 
-      y += 10;
+      y += 9.5;
     });
 
     doc.line(14, y, 196, y);
-    y += 12;
+    y += 11;
 
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
+    doc.setFontSize(11);
     doc.text(`Overall Station Air Quality Index: ${overallAQI} AQI`, 14, y);
     y += 6;
 
@@ -585,7 +750,21 @@ export default function StationDetails() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text(`Status: ${overallCat.fullName}`, 14, y);
+    doc.text(`Air Quality Status: ${overallCat.fullName}`, 14, y);
+    y += 6;
+
+    let healthAdvisory = "Air quality is considered satisfactory, and air pollution poses little or no risk.";
+    if (overallAQI > 50 && overallAQI <= 100) {
+      healthAdvisory = "Air quality is acceptable; unusually sensitive individuals should consider limiting prolonged outdoor exertion.";
+    } else if (overallAQI > 100 && overallAQI <= 150) {
+      healthAdvisory = "Members of sensitive groups may experience health effects. The general public is less likely to be affected.";
+    } else if (overallAQI > 150 && overallAQI <= 200) {
+      healthAdvisory = "Everyone may begin to experience health effects; members of sensitive groups may experience more serious health effects.";
+    } else if (overallAQI > 200) {
+      healthAdvisory = "Health alert: The risk of health effects is increased for everyone. Avoid prolonged outdoor exertion.";
+    }
+
+    doc.text(`Health Advisory: ${healthAdvisory}`, 14, y);
     y += 6;
     doc.text(
       "Telemetry streamed from physical IoT gateway and verified against US EPA piece-wise linear air standards.",
@@ -593,7 +772,41 @@ export default function StationDetails() {
       y
     );
 
-    doc.save(`${stationName.replace(/\s+/g, "_")}_Real_Air_Report_${selectedRange}.pdf`);
+    const safeFilename = `${stationName.replace(/\s+/g, "_")}_Air_Report_${selectedRange.replace(/\s+/g, "_")}.pdf`;
+    doc.save(safeFilename);
+  };
+
+  // Export raw telemetry rows for the selected custom range to CSV
+  const handleExportCSV = () => {
+    if (!filteredReadings.length) return;
+
+    const headers = ["Timestamp", "Station_ID", "Station_Name", "Overall_AQI", "PM25_ugm3", "SO2_ppb", "CO_ppm", "O3_ppm", "NO2_ppb"];
+    const rows = filteredReadings.map((r) => {
+      const aqi = calculateOverallAQI(r);
+      const ts = new Date(r.timestamp).toISOString();
+      return [
+        `"${ts}"`,
+        r.locationId ?? resolvedStationId,
+        `"${stationName.replace(/"/g, '""')}"`,
+        aqi,
+        r.pm25 ?? "",
+        r.so2 ?? "",
+        r.co ?? "",
+        r.o3 ?? "",
+        r.no2 ?? "",
+      ].join(",");
+    });
+
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `${stationName.replace(/\s+/g, "_")}_Telemetry_${selectedRange.replace(/\s+/g, "_")}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // 6. Build real chart data points for the Analytics Area Line Chart (Strictly reflects active date or date range)
@@ -610,8 +823,7 @@ export default function StationDetails() {
 
     return sampled.map((r) => {
       const date = new Date(r.timestamp);
-      const isMultiDay = selectedRange === "Last 7 Days" || selectedRange === "Last 30 Days" || selectedRange === "All Time";
-      const timeStr = isMultiDay
+      const timeStr = isMultiDayRange
         ? date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
         : date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
@@ -776,14 +988,75 @@ export default function StationDetails() {
             >
               <IoCalendarOutline className="text-sm text-gray-500" />
               <span>{dateLabel}</span>
-              <IoChevronDown className="text-xs text-gray-400" />
+              <IoChevronDown className={`text-xs text-gray-400 transition-transform duration-200 ${isCalendarOpen ? "rotate-180" : ""}`} />
             </button>
 
             {/* Interactive Calendar Dropdown */}
             {isCalendarOpen && (
-              <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-4 z-50 select-none">
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 z-50 select-none">
+                {/* Header: Mode Status and Upper-Right Custom Range Button */}
+                <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-gray-100 gap-2">
+                  <div className="text-left">
+                    <span className="text-[11px] font-bold text-gray-800 block">
+                      {isRangeMode
+                        ? !startDate
+                          ? "Pick start date..."
+                          : startDate && !endDate
+                          ? `Start: ${formatDate(startDate)}`
+                          : startDate && endDate
+                          ? `${formatDate(startDate)} - ${formatDate(endDate)}`
+                          : "Custom date range"
+                        : `Date: ${startDate ? formatDate(startDate) : formatDate(today)}`}
+                    </span>
+                    <span className="text-[10px] text-gray-400">
+                      {isRangeMode
+                        ? !startDate
+                          ? "Step 1: Click first date of range"
+                          : startDate && !endDate
+                          ? "Step 2: Hover & click ending date"
+                          : "Range selected"
+                        : "Click any date to view"}
+                    </span>
+                  </div>
+
+                  {/* Upper-Right Mode Trigger Button */}
+                  {!isRangeMode ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRangeMode(true);
+                        setStartDate(null);
+                        setEndDate(null);
+                        setHoverDate(null);
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg cursor-pointer transition flex items-center gap-1 shadow-2xs active:scale-95 shrink-0"
+                      title="Activate custom date range selection"
+                    >
+                      <span>+ Custom Range</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRangeMode(false);
+                        const activeDate = startDate || today;
+                        setStartDate(activeDate);
+                        setEndDate(activeDate);
+                        setHoverDate(null);
+                        setDateLabel(formatDate(activeDate));
+                        setSelectedRange(activeDate.toDateString() === today.toDateString() ? "Today" : "Custom");
+                      }}
+                      className="px-2 py-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg cursor-pointer transition flex items-center gap-1 active:scale-95 shrink-0"
+                      title="Switch back to single day selection"
+                    >
+                      <IoCheckmarkOutline className="text-xs" />
+                      <span>Range Active (Exit)</span>
+                    </button>
+                  )}
+                </div>
+
                 {/* Month Navigation */}
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+                <div className="flex items-center justify-between mb-3 pb-1">
                   <span className="text-xs font-bold text-gray-900">
                     {calendarMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                   </span>
@@ -821,34 +1094,47 @@ export default function StationDetails() {
                 </div>
 
                 {/* Days Grid */}
-                <div className="grid grid-cols-7 gap-1 text-center">
+                <div className="grid grid-cols-7 gap-y-1 text-center" onMouseLeave={() => setHoverDate(null)}>
                   {calendarDays.map((date, idx) => {
                     if (!date) return <div key={`empty-${idx}`} />;
-                    const isSelected =
-                      date.getDate() === selectedDate.getDate() &&
-                      date.getMonth() === selectedDate.getMonth() &&
-                      date.getFullYear() === selectedDate.getFullYear();
-
-                    // Check if this date has actual recordings in the database
+                    const rangeStatus = getDateRangeStatus(date);
                     const hasData = datesWithData.has(date.toDateString());
+
+                    let cellStyle = "text-gray-700 hover:bg-gray-100 rounded-lg";
+                    if (!isRangeMode) {
+                      if (rangeStatus.isSelected) {
+                        cellStyle = "bg-[#22c55e] text-white rounded-lg font-bold shadow-xs";
+                      }
+                    } else {
+                      if (rangeStatus.isStart && rangeStatus.isEnd) {
+                        cellStyle = "bg-[#22c55e] text-white rounded-lg font-bold shadow-xs";
+                      } else if (rangeStatus.isStart) {
+                        cellStyle = "bg-[#22c55e] text-white rounded-l-lg rounded-r-none font-bold shadow-xs";
+                      } else if (rangeStatus.isEnd) {
+                        cellStyle = "bg-[#22c55e] text-white rounded-r-lg rounded-l-none font-bold shadow-xs";
+                      } else if (rangeStatus.isInRange) {
+                        cellStyle = "bg-emerald-100/70 text-emerald-900 rounded-none font-semibold hover:bg-emerald-200";
+                      }
+                    }
 
                     return (
                       <button
                         key={date.toISOString()}
                         type="button"
                         onClick={() => handleSelectCalendarDate(date)}
-                        className={`h-8 rounded-lg flex flex-col items-center justify-center text-xs font-semibold cursor-pointer transition ${
-                          isSelected
-                            ? "bg-[#22c55e] text-white"
-                            : "text-gray-700 hover:bg-gray-100"
-                        }`}
+                        onMouseEnter={() => {
+                          if (isRangeMode && startDate && !endDate) {
+                            setHoverDate(date);
+                          }
+                        }}
+                        className={`h-8 flex flex-col items-center justify-center text-xs font-semibold cursor-pointer transition ${cellStyle}`}
                       >
                         <span className="leading-none">{date.getDate()}</span>
-                        {/* Small green dot indicator below date when real database data exists */}
+                        {/* Dot indicator below date when real database data exists */}
                         {hasData && (
                           <span
                             className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
-                              isSelected ? "bg-white" : "bg-emerald-500"
+                              rangeStatus.isStart || rangeStatus.isEnd ? "bg-white" : "bg-emerald-500"
                             }`}
                           />
                         )}
@@ -857,9 +1143,53 @@ export default function StationDetails() {
                   })}
                 </div>
 
-                <div className="mt-3 pt-2 border-t border-gray-100 text-[10px] text-gray-500 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>Dates with recorded database telemetry</span>
+                {/* Calendar Footer: Presets and Quick Actions */}
+                <div className="mt-3 pt-2 border-t border-gray-100 flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-[10px] text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span>Telemetry recorded</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {["Today", "Last 7D", "Last 30D"].map((p) => {
+                        const rangeMap: Record<string, string> = {
+                          Today: "Today",
+                          "Last 7D": "Last 7 Days",
+                          "Last 30D": "Last 30 Days",
+                        };
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => {
+                              handleSelectRange(rangeMap[p]);
+                              setIsCalendarOpen(false);
+                            }}
+                            className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-[10px] font-medium cursor-pointer"
+                          >
+                            {p}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {isRangeMode && startDate && !endDate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEndDate(startDate);
+                        setDateLabel(formatDate(startDate));
+                        setSelectedRange(startDate.toDateString() === today.toDateString() ? "Today" : "Custom");
+                        setIsCalendarOpen(false);
+                        setHoverDate(null);
+                        setIsRangeMode(false);
+                      }}
+                      className="w-full py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition cursor-pointer text-center"
+                    >
+                      Apply Single Day ({formatDate(startDate)})
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -873,11 +1203,11 @@ export default function StationDetails() {
               className="bg-white border border-gray-200/90 rounded-xl px-4 py-2 text-xs font-semibold text-gray-700 flex items-center gap-2 hover:bg-gray-50 shadow-xs cursor-pointer transition"
             >
               <span>{selectedRange}</span>
-              <IoChevronDown className="text-xs text-gray-400" />
+              <IoChevronDown className={`text-xs text-gray-400 transition-transform duration-200 ${isRangeOpen ? "rotate-180" : ""}`} />
             </button>
 
             {isRangeOpen && (
-              <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-50">
+              <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-50">
                 {["Today", "Last 7 Days", "Last 30 Days", "All Time"].map((range) => (
                   <button
                     key={range}
@@ -896,15 +1226,52 @@ export default function StationDetails() {
             )}
           </div>
 
-          {/* Export PDF Button */}
-          <button
-            type="button"
-            onClick={handleExportPDF}
-            className="bg-[#22c55e] hover:bg-[#16a34a] text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs transition active:scale-95 cursor-pointer"
-          >
-            <LuDownload className="text-sm" />
-            <span>Export</span>
-          </button>
+          {/* Export Dropdown Menu (PDF Report & CSV Telemetry) */}
+          <div className="relative" ref={exportRef}>
+            <button
+              type="button"
+              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+              className="bg-[#22c55e] hover:bg-[#16a34a] text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs transition active:scale-95 cursor-pointer"
+            >
+              <LuDownload className="text-sm" />
+              <span>Export</span>
+              <IoChevronDown className={`text-xs transition-transform duration-200 ${isExportMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {isExportMenuOpen && (
+              <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-2xl border border-gray-100 py-1.5 z-50 select-none">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleExportPDF();
+                    setIsExportMenuOpen(false);
+                  }}
+                  className="w-full px-4 py-2.5 text-left text-xs font-semibold text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2.5 transition cursor-pointer"
+                >
+                  <LuDownload className="text-base text-emerald-600 shrink-0" />
+                  <div>
+                    <div className="font-bold text-gray-900">PDF Report</div>
+                    <div className="text-[10px] text-gray-500 font-normal">Formatted period report</div>
+                  </div>
+                </button>
+                <div className="border-t border-gray-100 my-1" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleExportCSV();
+                    setIsExportMenuOpen(false);
+                  }}
+                  className="w-full px-4 py-2.5 text-left text-xs font-semibold text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2.5 transition cursor-pointer"
+                >
+                  <LuFileSpreadsheet className="text-base text-emerald-600 shrink-0" />
+                  <div>
+                    <div className="font-bold text-gray-900">CSV Raw Telemetry</div>
+                    <div className="text-[10px] text-gray-500 font-normal">Spreadsheet data rows</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1096,9 +1463,9 @@ export default function StationDetails() {
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              {chartPoints.length > 0
-                ? `Timeline of ${chartPoints.length} recordings for ${dateLabel}`
-                : `No telemetry recorded on ${dateLabel}`}
+              {filteredReadings.length > 0
+                ? `Timeline of ${filteredReadings.length} recordings across ${dateLabel}`
+                : `No telemetry recorded for ${dateLabel}`}
             </p>
           </div>
 
@@ -1147,10 +1514,10 @@ export default function StationDetails() {
               <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 text-sm font-medium border border-dashed border-gray-200 rounded-2xl py-12 px-4 text-center">
                 <IoCalendarOutline className="text-3xl text-gray-300 mb-2" />
                 <span className="font-semibold text-gray-700">
-                  No telemetry recorded on {dateLabel}
+                  No telemetry recorded for {dateLabel}
                 </span>
                 <span className="text-xs text-gray-400 mt-1 max-w-md">
-                  There are no readings stored for this date in the database. Choose a date marked with a green dot in the calendar or select another range from the date range dropdown above.
+                  There are no readings stored for this date range in the database. Choose dates marked with a green dot in the calendar or select another range from the date range dropdown above.
                 </span>
               </div>
             ) : (

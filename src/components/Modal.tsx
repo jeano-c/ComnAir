@@ -31,25 +31,27 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm"
       onClick={onClose} // Clicking the backdrop closes the modal
     >
       <div
-        className={`bg-white rounded-3xl p-6 md:p-8 w-full ${maxWidth} shadow-2xl animate-in fade-in zoom-in duration-200`}
+        className={`bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 w-full ${maxWidth} max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200`}
         onClick={(e) => e.stopPropagation()} // Clicking inside the modal prevents it from closing
       >
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-4 pb-1 shrink-0">
           <h2 className="text-xl font-bold text-gray-800">{title}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 transition-colors p-2"
+            className="text-gray-400 hover:text-gray-700 transition-colors p-2 rounded-xl hover:bg-gray-100"
           >
             <FaXmark className="text-xl" />
           </button>
         </div>
 
-        {/* Render whatever form or content is passed into the modal */}
-        {children}
+        {/* Scrollable body content so modals never overflow the screen */}
+        <div className="overflow-y-auto flex-1 min-h-0 pr-1">
+          {children}
+        </div>
       </div>
     </div>
   );
