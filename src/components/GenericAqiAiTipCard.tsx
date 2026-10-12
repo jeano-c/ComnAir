@@ -22,9 +22,94 @@ import {
   MdRefresh,
   MdAir,
   MdLocationOn,
+  MdElderly,
+  MdChildCare,
+  MdPregnantWoman,
 } from "react-icons/md";
-import { FaHeartbeat, FaExclamationTriangle } from "react-icons/fa";
+import { FaHeartbeat, FaExclamationTriangle, FaLungs } from "react-icons/fa";
 import { IoShieldCheckmarkOutline, IoSparkles } from "react-icons/io5";
+
+// All distinct health conditions recognized across ComnAir
+const HEALTH_CONDITIONS = [
+  {
+    id: "asthma",
+    name: "Asthma",
+    group: "Respiratory",
+    icon: FaLungs,
+    headerColor: "from-sky-500 to-blue-600",
+    bgTint: "bg-sky-50/60",
+    borderTint: "border-sky-200",
+    iconBg: "bg-sky-100 text-sky-600",
+    badgeBg: "bg-sky-100 text-sky-800 border-sky-200",
+    note: "Keep rescue inhalers accessible; guard against bronchospasm & cold drafts.",
+    extractTip: (res: GenericAiTipResult | null) => res?.conditionTips?.asthma,
+  },
+  {
+    id: "copd",
+    name: "COPD & Chronic Lung",
+    group: "Chronic Pulmonary",
+    icon: FaLungs,
+    headerColor: "from-indigo-500 to-violet-600",
+    bgTint: "bg-indigo-50/60",
+    borderTint: "border-indigo-200",
+    iconBg: "bg-indigo-100 text-indigo-600",
+    badgeBg: "bg-indigo-100 text-indigo-800 border-indigo-200",
+    note: "Minimize airway resistance; remain in HEPA-filtered indoor areas during spikes.",
+    extractTip: (res: GenericAiTipResult | null) => res?.conditionTips?.copd,
+  },
+  {
+    id: "heartDisease",
+    name: "Heart Disease & Cardio",
+    group: "Cardiovascular",
+    icon: FaHeartbeat,
+    headerColor: "from-rose-500 to-red-600",
+    bgTint: "bg-rose-50/60",
+    borderTint: "border-rose-200",
+    iconBg: "bg-rose-100 text-rose-600",
+    badgeBg: "bg-rose-100 text-rose-800 border-rose-200",
+    note: "Elevated particulates raise arterial stress and blood pressure; avoid strenuous exertion.",
+    extractTip: (res: GenericAiTipResult | null) => res?.conditionTips?.heartDisease,
+  },
+  {
+    id: "pregnancyOrDiabetes",
+    name: "Pregnancy & Diabetes",
+    group: "Prenatal & Metabolic",
+    icon: MdPregnantWoman,
+    headerColor: "from-amber-500 to-orange-600",
+    bgTint: "bg-amber-50/60",
+    borderTint: "border-amber-200",
+    iconBg: "bg-amber-100 text-amber-600",
+    badgeBg: "bg-amber-100 text-amber-800 border-amber-200",
+    note: "Guards maternal blood oxygenation and prevents systemic metabolic inflammation.",
+    extractTip: (res: GenericAiTipResult | null) => res?.conditionTips?.pregnancyOrDiabetes,
+  },
+  {
+    id: "elderly",
+    name: "Older Adults (65+)",
+    group: "Cardiopulmonary Reserve",
+    icon: MdElderly,
+    headerColor: "from-blue-500 to-cyan-600",
+    bgTint: "bg-blue-50/60",
+    borderTint: "border-blue-200",
+    iconBg: "bg-blue-100 text-blue-600",
+    badgeBg: "bg-blue-100 text-blue-800 border-blue-200",
+    note: "Seniors have higher sensitivity to particulate fatigue; keep home windows sealed.",
+    extractTip: (res: GenericAiTipResult | null) => res?.conditionTips?.elderly,
+  },
+  {
+    id: "children",
+    name: "Children & Youth (<18)",
+    group: "Developing Lungs",
+    icon: MdChildCare,
+    headerColor: "from-teal-500 to-emerald-600",
+    bgTint: "bg-teal-50/60",
+    borderTint: "border-teal-200",
+    iconBg: "bg-teal-100 text-teal-600",
+    badgeBg: "bg-teal-100 text-teal-800 border-teal-200",
+    note: "Higher respiratory rate per pound; adjust school playground and outdoor athletic drills.",
+    extractTip: (res: GenericAiTipResult | null) => res?.conditionTips?.children,
+  },
+];
 
 // Fallback monitoring stations matching Dashboard mockup
 const DEFAULT_LOCATIONS = [
@@ -458,82 +543,115 @@ export default function GenericAqiAiTipCard() {
             </div>
           </div>
 
-          {/* --- Dual Generic Health Advice Cards --- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* 1. WITHOUT Health Problems (General Public) */}
-            <div className="bg-white rounded-2xl p-5 border border-emerald-100 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-emerald-800">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 text-base">
-                      <MdOutlineDirectionsRun />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-extrabold leading-tight">
-                        Without Health Problems
-                      </h3>
-                      <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
-                        General Population
-                      </span>
-                    </div>
+          {/* --- Section 1: WITHOUT Health Problems (General Public) --- */}
+          <div className="bg-white rounded-2xl p-5 border border-emerald-100 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2.5 text-emerald-800">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 text-lg shadow-2xs">
+                    <MdOutlineDirectionsRun />
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md border border-emerald-200/60">
-                    Standard Guidance
-                  </span>
+                  <div>
+                    <h3 className="text-base font-extrabold leading-tight text-slate-900">
+                      General Healthy Population
+                    </h3>
+                
+                  </div>
                 </div>
-
-                <div className="bg-emerald-50/50 rounded-xl p-3.5 border border-emerald-100/60">
-                  <p className="text-sm text-slate-700 leading-relaxed font-medium">
-                    {tipResult?.withoutHealthProblems}
-                  </p>
-                </div>
+                <span className="text-[11px] font-bold px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200/60">
+                  Standard Guidance
+                </span>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-[11px] text-slate-500 font-medium">
-                <IoShieldCheckmarkOutline className="text-emerald-500 text-sm shrink-0" />
-                <span>
-                  Applies to daily activities, commuting, and regular outdoor fitness in {stationMetrics.stationName}.
-                </span>
+              <div className="bg-emerald-50/50 rounded-xl p-4 border border-emerald-100/70">
+                <p className="text-sm text-slate-700 leading-relaxed font-medium">
+                  {tipResult?.withoutHealthProblems}
+                </p>
               </div>
             </div>
 
-            {/* 2. WITH Health Problems (Sensitive Groups) */}
-            <div className="bg-white rounded-2xl p-5 border border-amber-200/90 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-rose-500" />
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-amber-900">
-                    <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 text-base">
-                      <FaHeartbeat />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-extrabold leading-tight">
-                        With Health Problems
-                      </h3>
-                      <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">
-                        Sensitive & At-Risk Groups
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-800 rounded-md border border-amber-200/60">
-                    Special Precautions
-                  </span>
-                </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+              <IoShieldCheckmarkOutline className="text-emerald-500 text-base shrink-0" />
+              <span>
+                Applies to daily commuting, work, recreation, and natural home ventilation in {stationMetrics.stationName}.
+              </span>
+            </div>
+          </div>
 
-                <div className="bg-amber-50/50 rounded-xl p-3.5 border border-amber-100/70">
-                  <p className="text-sm text-slate-800 leading-relaxed font-medium">
-                    {tipResult?.withHealthProblems}
+          {/* --- Section 2: Health Problems Breakdown (Each Listed Health Condition) --- */}
+          <div className="flex flex-col gap-4">
+            <div className="pt-2">
+              <div className="flex items-center gap-2 text-slate-900">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center text-lg">
+                  <MdOutlineHealthAndSafety />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                    Advisories by Health Problem
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Tailored AI precautions for sensitive & pre-existing health profiles
                   </p>
                 </div>
               </div>
+            </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-[11px] text-slate-500 font-medium">
-                <MdOutlineHealthAndSafety className="text-amber-500 text-sm shrink-0" />
-                <span>
-                  Crucial for asthma, COPD, heart disease, elderly, and children in {stationMetrics.stationName}.
-                </span>
-              </div>
+            {/* Condition Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {HEALTH_CONDITIONS.map((cond) => {
+                const Icon = cond.icon;
+                const tipText =
+                  cond.extractTip(tipResult) ||
+                  tipResult?.withHealthProblems ||
+                  "Follow general precautions for sensitive groups.";
+
+                return (
+                  <div
+                    key={cond.id}
+                    className={`bg-white rounded-2xl p-5 border ${cond.borderTint} shadow-2xs flex flex-col justify-between hover:shadow-md transition-all relative overflow-hidden group`}
+                  >
+                    <div
+                      className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${cond.headerColor}`}
+                    />
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 ${cond.iconBg}`}
+                          >
+                            <Icon />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-extrabold text-slate-900 leading-tight">
+                              {cond.name}
+                            </h4>
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
+                              {cond.group}
+                            </span>
+                          </div>
+                        </div>
+                        <span
+                          className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${cond.badgeBg}`}
+                        >
+                          Targeted Tip
+                        </span>
+                      </div>
+
+                      <div className={`rounded-xl p-3.5 ${cond.bgTint} border border-slate-100`}>
+                        <p className="text-xs text-slate-800 leading-relaxed font-medium">
+                          {tipText}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-start gap-1.5 text-[10px] text-slate-500 font-medium">
+                      <span className="text-slate-400 shrink-0">ℹ️</span>
+                      <span className="line-clamp-2">{cond.note}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
