@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { IoPersonOutline, IoKeyOutline, IoShieldCheckmarkOutline } from "react-icons/io5";
+import {
+  IoPersonOutline,
+  IoKeyOutline,
+  IoShieldCheckmarkOutline,
+  IoEyeOutline,
+  IoEyeOffOutline,
+} from "react-icons/io5";
 
 export default function Profile() {
   const { user, updateProfile, isUpdatingProfile, changePassword, isChangingPassword } = useAuth();
@@ -14,6 +20,9 @@ export default function Profile() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passSuccess, setPassSuccess] = useState("");
   const [passError, setPassError] = useState("");
 
@@ -22,11 +31,12 @@ export default function Profile() {
   useEffect(() => {
     if (user?.name) {
       setDisplayName(user.name);
+      localStorage.setItem("admin_name", user.name);
     } else {
       const stored = localStorage.getItem("admin_name");
       if (stored) setDisplayName(stored);
     }
-  }, [user]);
+  }, [user?.name]);
 
   // Initials generator: first two letters
   const getInitials = (name?: string): string => {
@@ -43,18 +53,21 @@ export default function Profile() {
     setNameSuccess("");
     setNameError("");
 
-    if (!displayName.trim()) {
+    const trimmed = displayName.trim();
+    if (!trimmed) {
       setNameError("Display name cannot be empty.");
       return;
     }
 
     try {
-      localStorage.setItem("admin_name", displayName.trim());
-      await updateProfile({ name: displayName.trim() });
+      localStorage.setItem("admin_name", trimmed);
+      window.dispatchEvent(new Event("admin_name_updated"));
+      await updateProfile({ name: trimmed });
       setNameSuccess("Display name updated successfully.");
     } catch (err: any) {
       // In case backend is offline, still persist locally for UI consistency
-      localStorage.setItem("admin_name", displayName.trim());
+      localStorage.setItem("admin_name", trimmed);
+      window.dispatchEvent(new Event("admin_name_updated"));
       setNameSuccess("Display name updated.");
     }
   };
@@ -226,39 +239,81 @@ export default function Profile() {
               <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                 Current Password
               </label>
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Enter current password"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
-              />
+              <div className="relative">
+                <input
+                  type={showCurrentPassword ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter current password"
+                  className="w-full px-4 pr-11 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition p-1 cursor-pointer flex items-center justify-center"
+                  title={showCurrentPassword ? "Hide password" : "Show password"}
+                >
+                  {showCurrentPassword ? (
+                    <IoEyeOffOutline className="text-lg" />
+                  ) : (
+                    <IoEyeOutline className="text-lg" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                 New Password
               </label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password (minimum 6 characters)"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
-              />
+              <div className="relative">
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (minimum 6 characters)"
+                  className="w-full px-4 pr-11 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition p-1 cursor-pointer flex items-center justify-center"
+                  title={showNewPassword ? "Hide password" : "Show password"}
+                >
+                  {showNewPassword ? (
+                    <IoEyeOffOutline className="text-lg" />
+                  ) : (
+                    <IoEyeOutline className="text-lg" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                 Confirm New Password
               </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="w-full px-4 pr-11 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition p-1 cursor-pointer flex items-center justify-center"
+                  title={showConfirmPassword ? "Hide password" : "Show password"}
+                >
+                  {showConfirmPassword ? (
+                    <IoEyeOffOutline className="text-lg" />
+                  ) : (
+                    <IoEyeOutline className="text-lg" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="pt-2 flex justify-end">

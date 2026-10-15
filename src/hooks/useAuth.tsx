@@ -38,6 +38,11 @@ export function useAuth() {
         ...old,
         ...updatedUser,
       }));
+      if (updatedUser?.name) {
+        localStorage.setItem("admin_name", updatedUser.name);
+        window.dispatchEvent(new Event("admin_name_updated"));
+      }
+      queryClient.invalidateQueries({ queryKey: ["authUser"] });
     },
   });
 

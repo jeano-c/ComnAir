@@ -11,6 +11,7 @@ import {
 import { MdMoreVert } from "react-icons/md";
 import { LuDownload, LuFileSpreadsheet } from "react-icons/lu";
 import { jsPDF } from "jspdf";
+import { generateStationPdfReport } from "../utils/reportPdfGenerator";
 import { socket } from "../api/socket";
 import { location as locationApi } from "../api/location";
 import {
@@ -622,158 +623,18 @@ export default function StationDetails() {
     return days;
   }, [calendarMonth]);
 
-  // Export to PDF with real database values
+  // Export to PDF with real database values, generic public AQI tips, and condition advisories
   const handleExportPDF = () => {
-    const doc = new jsPDF();
-
-    // Header banner
-    doc.setFillColor(31, 143, 34);
-    doc.rect(0, 0, 210, 22, "F");
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("ComnAir Environmental Monitoring Report", 14, 14);
-
-    // Station & Meta details
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(14);
-    doc.text(`Station: ${stationName}`, 14, 34);
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 116, 139);
-    const isAvg = effectivePollutantData.isAverage;
-    doc.text(`Reporting Period: ${dateLabel} (${selectedRange})`, 14, 42);
-    doc.text(`Generated On: ${new Date().toLocaleString()}`, 14, 48);
-    doc.text(
-      `Hardware Gateway ID: ${activeStation.gateway?.id || "esp_32"} | Status: ${
-        activeStation.status || "OFFLINE"
-      }`,
-      14,
-      54
-    );
-    doc.text(
-      `Metric Mode: ${
-        isAvg
-          ? `Period Aggregate Summary (Mean of ${filteredReadings.length} telemetry readings)`
-          : `Live Telemetry Snapshot (${filteredReadings.length} total readings)`
-      }`,
-      14,
-      60
-    );
-
-    doc.setDrawColor(226, 232, 240);
-    doc.line(14, 64, 196, 64);
-
-    // Pollutant Metrics Table Header
-    doc.setFontSize(9.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(15, 23, 42);
-    doc.text("Pollutant", 14, 72);
-    doc.text(isAvg ? "Avg Conc" : "Concentration", 46, 72);
-    doc.text("Min", 78, 72);
-    doc.text("Peak / Max", 100, 72);
-    doc.text("Sub-AQI", 130, 72);
-    doc.text("EPA Category", 152, 72);
-    doc.text("Data Source", 176, 72);
-
-    doc.line(14, 75, 196, 75);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-
-    let y = 83;
-    SENSOR_METRICS.forEach((sensor) => {
-      const pStat = pollutantStats?.[sensor.key];
-      const avgVal = pStat?.avg ?? (typeof effectivePollutantData.values[sensor.key] === "number" ? effectivePollutantData.values[sensor.key] : null);
-      const minVal = pStat?.min ?? avgVal;
-      const maxVal = pStat?.max ?? avgVal;
-
-      let subAQI = 0;
-      if (avgVal !== null) {
-        if (sensor.key === "pm25") subAQI = calculatePM25AQI(avgVal);
-        else if (sensor.key === "so2") subAQI = calculateSO2AQI(avgVal);
-        else if (sensor.key === "co") subAQI = calculateCOAQI(avgVal);
-        else if (sensor.key === "o3") subAQI = calculateO3AQI(avgVal);
-        else if (sensor.key === "no2") subAQI = calculateNO2AQI(avgVal);
-      }
-
-      const cat = getAqiCategory(subAQI);
-      const isFallback =
-        activeStation.sensorHealth?.[sensor.key]?.source === "OPEN_METEO_FALLBACK" ||
-        activeStation.fallbackSensors?.includes(sensor.key);
-
-      const sourceStr =
-        avgVal === null
-          ? "Offline"
-          : isFallback
-          ? "Satellite"
-          : "Hardware";
-
-      doc.setTextColor(30, 41, 59);
-      doc.text(sensor.label, 14, y);
-      doc.text(
-        avgVal !== null ? `${avgVal.toFixed(sensor.decimals)} ${sensor.unit}` : "--",
-        46,
-        y
-      );
-      doc.text(minVal !== null ? `${minVal.toFixed(sensor.decimals)}` : "--", 78, y);
-      doc.text(maxVal !== null ? `${maxVal.toFixed(sensor.decimals)}` : "--", 100, y);
-      doc.text(avgVal !== null ? `${subAQI}` : "--", 130, y);
-
-      if (cat.label === "Hazardous" || cat.label === "Very Unhealthy") {
-        doc.setTextColor(159, 18, 57);
-      } else if (cat.label.includes("Unhealthy")) {
-        doc.setTextColor(234, 88, 12);
-      } else {
-        doc.setTextColor(22, 163, 74);
-      }
-      doc.text(cat.label, 152, y);
-
-      doc.setTextColor(100, 116, 139);
-      doc.text(sourceStr, 176, y);
-
-      y += 9.5;
+    generateStationPdfReport({
+      stationName,
+      station: activeStation,
+      dateLabel,
+      selectedRange,
+      filteredReadings,
+      pollutantStats,
+      effectivePollutantData,
+      overallAQI,
     });
-
-    doc.line(14, y, 196, y);
-    y += 11;
-
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(11);
-    doc.text(`Overall Station Air Quality Index: ${overallAQI} AQI`, 14, y);
-    y += 6;
-
-    const overallCat = getAqiCategory(overallAQI);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
-    doc.text(`Air Quality Status: ${overallCat.fullName}`, 14, y);
-    y += 6;
-
-    let healthAdvisory = "Air quality is considered satisfactory, and air pollution poses little or no risk.";
-    if (overallAQI > 50 && overallAQI <= 100) {
-      healthAdvisory = "Air quality is acceptable; unusually sensitive individuals should consider limiting prolonged outdoor exertion.";
-    } else if (overallAQI > 100 && overallAQI <= 150) {
-      healthAdvisory = "Members of sensitive groups may experience health effects. The general public is less likely to be affected.";
-    } else if (overallAQI > 150 && overallAQI <= 200) {
-      healthAdvisory = "Everyone may begin to experience health effects; members of sensitive groups may experience more serious health effects.";
-    } else if (overallAQI > 200) {
-      healthAdvisory = "Health alert: The risk of health effects is increased for everyone. Avoid prolonged outdoor exertion.";
-    }
-
-    doc.text(`Health Advisory: ${healthAdvisory}`, 14, y);
-    y += 6;
-    doc.text(
-      "Telemetry streamed from physical IoT gateway and verified against US EPA piece-wise linear air standards.",
-      14,
-      y
-    );
-
-    const safeFilename = `${stationName.replace(/\s+/g, "_")}_Air_Report_${selectedRange.replace(/\s+/g, "_")}.pdf`;
-    doc.save(safeFilename);
   };
 
   // Export raw telemetry rows for the selected custom range to CSV

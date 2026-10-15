@@ -3,10 +3,12 @@ import { useNavigate } from "react-router";
 import { MdSensors, MdMoreVert } from "react-icons/md";
 import { IoIosArrowForward } from "react-icons/io";
 import { FaPlus, FaTrash } from "react-icons/fa";
+import { LuDownload } from "react-icons/lu";
 import { socket } from "../api/socket";
 import AddLocationModal from "../components/AddLocationModal";
 import SensorStatusDrawer from "../components/SensorStatusDrawer";
 import { useLocations } from "../hooks/useLocation";
+import { generateStationPdfReport } from "../utils/reportPdfGenerator";
 
 // ==========================================
 // 1. HELPERS & SENSOR CONFIG
@@ -249,6 +251,44 @@ function Home() {
     return DEFAULT_LOCATIONS;
   }, [overviewData]);
 
+  // Export station report with generic tips and health problem advisories directly from dashboard
+  const handleExportStationReport = (location: any) => {
+    const latestAqi = location.latestAQI ?? 23;
+    const pm25 = getSensorReading(location, "pm25") ?? 14;
+    const so2 = getSensorReading(location, "so2") ?? 14;
+    const co = getSensorReading(location, "co") ?? 14;
+    const o3 = getSensorReading(location, "o3") ?? 14;
+    const no2 = getSensorReading(location, "no2") ?? 14;
+
+    const currentValues = { pm25, so2, co, o3, no2 };
+    const mockReading = {
+      ...currentValues,
+      timestamp: location.lastUpdated || new Date().toISOString(),
+      locationId: location.id,
+    };
+
+    generateStationPdfReport({
+      stationName: location.name,
+      station: location,
+      dateLabel: "Today",
+      selectedRange: "Today",
+      filteredReadings: [mockReading],
+      pollutantStats: {
+        pm25: { avg: pm25, min: pm25, max: pm25 },
+        so2: { avg: so2, min: so2, max: so2 },
+        co: { avg: co, min: co, max: co },
+        o3: { avg: o3, min: o3, max: o3 },
+        no2: { avg: no2, min: no2, max: no2 },
+      },
+      effectivePollutantData: {
+        isAverage: false,
+        modeLabel: "Current",
+        values: currentValues,
+      },
+      overallAQI: latestAqi,
+    });
+  };
+
   return (
     <div className="p-6 md:p-8 lg:p-10 bg-[#f8fafc] min-h-screen flex flex-col font-sans">
       {/* --- Action Row / Dashboard Header --- */}
@@ -366,6 +406,19 @@ function Home() {
                           >
                             <span>View Details</span>
                             <IoIosArrowForward className="text-xs text-gray-400" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(null);
+                              handleExportStationReport(location);
+                            }}
+                            className="w-full px-3.5 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center justify-between cursor-pointer transition"
+                          >
+                            <span>Export PDF</span>
+                            <LuDownload className="text-xs text-emerald-600" />
                           </button>
 
                           <button

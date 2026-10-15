@@ -6,6 +6,8 @@ import {
   IoMailOutline,
   IoPersonOutline,
   IoLogOutOutline,
+  IoSunny,
+  IoMoon,
 } from "react-icons/io5";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { useAuth } from "../hooks/useAuth";
@@ -96,13 +98,47 @@ const SEARCH_REGISTRY: SearchItem[] = [
   },
 ];
 
+// Helper to get time-based greeting
+const getGreeting = (): string => {
+  const hour = new Date().getHours();
+  if (hour < 12) {
+    return "Good morning";
+  }
+  if (hour < 18) {
+    return "Good afternoon";
+  }
+  return "Good evening";
+};
+
+// Helper to format date like '05 DEC, FRIDAY'
+const getFormattedDate = (): string => {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, "0");
+  const month = now.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+  const weekday = now.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
+  return `${day} ${month}, ${weekday}`;
+};
+
 export default function Header({ isSidebarOpen, toggleSidebar }: HeaderProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+  const [greeting, setGreeting] = useState(getGreeting);
+  const [currentDate, setCurrentDate] = useState(getFormattedDate);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [imgError, setImgError] = useState(false);
+
+  const isEvening = greeting === "Good evening" || new Date().getHours() >= 18 || new Date().getHours() < 6;
+
+  // Update greeting and date periodically
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setGreeting(getGreeting());
+      setCurrentDate(getFormattedDate());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -179,12 +215,33 @@ export default function Header({ isSidebarOpen, toggleSidebar }: HeaderProps) {
     return name.trim().slice(0, 2).toUpperCase();
   };
 
-  const storedName = typeof window !== "undefined" ? localStorage.getItem("admin_name") : null;
-  const adminName = storedName || user?.name || "Admin";
+  const [adminName, setAdminName] = useState(() => {
+    const stored = typeof window !== "undefined" ? localStorage.getItem("admin_name") : null;
+    return stored || user?.name || "Admin";
+  });
+
+  useEffect(() => {
+    const current = localStorage.getItem("admin_name") || user?.name || "Admin";
+    setAdminName(current);
+  }, [user?.name]);
+
+  useEffect(() => {
+    const handleNameUpdate = () => {
+      const current = localStorage.getItem("admin_name") || user?.name || "Admin";
+      setAdminName(current);
+    };
+    window.addEventListener("admin_name_updated", handleNameUpdate);
+    window.addEventListener("storage", handleNameUpdate);
+    return () => {
+      window.removeEventListener("admin_name_updated", handleNameUpdate);
+      window.removeEventListener("storage", handleNameUpdate);
+    };
+  }, [user?.name]);
+
   const adminEmail = user?.email || "admin@comnair.com";
 
   return (
-    <header className="bg-white w-full px-6 sm:px-8 py-3.5 flex items-center justify-between border-b border-gray-100 z-40 shrink-0">
+    <header className="bg-white w-full px-6 sm:px-8 py-3.5 flex items-center justify-between gap-4 border-b border-gray-100 z-40 shrink-0">
       {/* Left Side: Hamburger (if sidebar closed) & Search Bar */}
       <div className="flex items-center gap-3">
         {!isSidebarOpen && (
@@ -248,8 +305,27 @@ export default function Header({ isSidebarOpen, toggleSidebar }: HeaderProps) {
         </div>
       </div>
 
+      {/* Dynamic Greeting & Date */}
+      <div className="hidden sm:flex items-center gap-3 px-2 min-w-0">
+        {/* Date Badge */}
+        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/90 bg-[#f8fafc] text-xs font-semibold text-gray-700 tracking-wide uppercase select-none shrink-0 shadow-2xs">
+          {isEvening ? (
+            <IoMoon className="text-indigo-500 text-sm" />
+          ) : (
+            <IoSunny className="text-amber-500 text-sm" />
+          )}
+          <span>{currentDate}</span>
+        </div>
+
+        {/* Dynamic Greeting */}
+        <p className="text-sm md:text-base text-gray-600 truncate">
+          {greeting},{" "}
+          <span className="font-semibold text-gray-900">{adminName}</span>
+        </p>
+      </div>
+
       {/* Right Side: Mail Button, Notification Bell with Green Dot, Profile Avatar */}
-      <div className="flex items-center gap-3 sm:gap-3.5">
+      <div className="flex items-center gap-3 sm:gap-3.5 shrink-0">
         {/* Mail Icon Button */}
         <button
           type="button"
